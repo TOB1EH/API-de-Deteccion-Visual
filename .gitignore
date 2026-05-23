@@ -1,0 +1,33 @@
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Credenciales y secretos
+credentials.json
+secrets.json
+*.pem
+*.key
+
+# Directorios sensibles
+.aws/
+.ssh/
+
+# Docker
+volumes/
+.docker/
+
+# Editor e IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
