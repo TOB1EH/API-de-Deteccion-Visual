@@ -25,11 +25,6 @@ Infraestructura base funcionando en local y remota con HTTPS, proxy reverso, y a
 docker compose up -d
 ```
 
-### Validar servicios
-```bash
-./validate_local.sh
-```
-
 ### Conectarse a PostgreSQL
 ```bash
 PGPASSWORD=secure_pwd_local psql -h localhost -U detections_user -d detections_db
