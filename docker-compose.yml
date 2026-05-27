@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   # PostgreSQL con pgvector
   db:
@@ -68,6 +70,7 @@ services:
       - seaweed-master
       - seaweed-volume
       - pgadmin
+      - api
     networks:
       - api-detection-net
     restart: unless-stopped
@@ -86,13 +89,40 @@ services:
       - db
     restart: unless-stopped
 
+  # API REST
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: api_detection_api
+    ports:
+      - "8000:8000"
+    environment:
+      # Conexión a PostgreSQL (desde dentro de Docker: nombre del container)
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # Conexión a SeaweedFS (desde dentro de Docker: nombre del container)
+      SEAWEED_URL: http://seaweed-volume:8080
+      # URL pública para acceder a imágenes (desde cliente externo)
+      SEAWEED_PUBLIC_URL: https://bfts2026.mooo.com/seaweed
+    volumes:
+      # Montar carpeta de modelos (solo lectura)
+      - ./models/local:/app/models/local:ro
+      # Montar código (para live reload en desarrollo)
+      - ./src:/app/src
+    depends_on:
+      - db
+      - seaweed-volume
+    networks:
+      - api-detection-net
+    restart: unless-stopped
+
 # Redes
 networks:
   api-detection-net:
     driver: bridge
 
 # VOLUMENES
-# Se crean automáticamente en ./volumes/ y persisten datos entre reinicios
-# - ./volumes/pg_data/          → datos de PostgreSQL
-# - ./volumes/seaweed_master/   → metadatos del master
-# - ./volumes/seaweed_volume/   → archivos almacenados (imágenes, modelos)
+volumes:
+  pg_data:
+  seaweed_master:
+  seaweed_volume:

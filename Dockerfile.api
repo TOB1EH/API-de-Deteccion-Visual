@@ -1,0 +1,33 @@
+# Imagen Docker que ejecuta la API Python FastAPI
+
+# Usar imagen oficial Python slim (más pequeña, ~160MB)
+FROM python:3.11-slim
+
+# Establecer directorio de trabajo en el contenedor
+WORKDIR /app
+
+# Instalar dependencias del sistema necesarias para compilar psycopg2
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar archivo de dependencias
+COPY requirements.txt .
+
+# Instalar dependencias Python (sin cachés para reducir tamaño)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código fuente de la aplicación
+COPY src/ ./src/
+
+# Copiar carpeta de modelos (solo lectura)
+COPY models/ ./models/
+
+# Exponer puerto donde escucha la API
+EXPOSE 8000
+
+# Comando para ejecutar la API con uvicorn
+# --host 0.0.0.0 permite que se acceda desde fuera del contenedor
+# --port 8000 es el puerto interno
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
