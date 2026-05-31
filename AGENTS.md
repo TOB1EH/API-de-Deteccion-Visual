@@ -105,24 +105,6 @@ https://bfts2026.mooo.com/seaweed-master/ (Master - estado)
 | Contenedores | Docker Compose | 3.9 | Red aislada api-detection-net |
 | Firewall | UFW | - | SSH 22, HTTP 80, HTTPS 443, PostgreSQL 5432, SeaweedFS 9333/8080 |
 
-## Credenciales (LOCAL vs REMOTA)
-
-### LOCAL (localhost)
-```
-DB User: detections_user
-DB Password: secure_pwd_local
-DB Name: detections_db
-```
-
-### REMOTA (bfts2026.mooo.com)
-```
-DB User: detections_user
-DB Password: bfts2026.
-DB Name: detections_db
-pgAdmin Email: admin@bfts2026.mooo.com
-pgAdmin Password: bfts2026.
-```
-
 ## Próximas Fases (Roadmap)
 
 1. **Fase 2:** Endpoint S1 (GET `/models`) - Listar modelos YOLO disponibles

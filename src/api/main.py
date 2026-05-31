@@ -23,9 +23,9 @@ app = FastAPI(
     title="API Detección Visual",
     description="API para detección visual, almacenamiento y reconocimiento facial",
     version="1.0.0",
-    docs_url="/docs",              # Swagger UI en /docs
-    redoc_url="/redoc",            # ReDoc en /redoc
-    openapi_url="/openapi.json",   # OpenAPI schema
+    docs_url="/api/docs",              # Swagger UI bajo /api/ (accesible via Nginx)
+    redoc_url="/api/redoc",            # ReDoc bajo /api/
+    openapi_url="/api/openapi.json",   # OpenAPI schema bajo /api/
 )
 
 # ===== MIDDLEWARE CORS =====
