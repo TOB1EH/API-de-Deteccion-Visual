@@ -7,6 +7,8 @@ de la API.
 
 import logging
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import models, detections
 from datetime import datetime, timezone
@@ -20,12 +22,12 @@ logger = logging.getLogger(__name__)
 
 # ===== CREAR APLICACIÓN FASTAPI =====
 app = FastAPI(
-    title="API Detección Visual",
-    description="API para detección visual, almacenamiento y reconocimiento facial",
+    title="API Deteccion Visual",
+    description="API para deteccion visual, almacenamiento y reconocimiento facial",
     version="1.0.0",
-    docs_url="/api/docs",              # Swagger UI bajo /api/ (accesible via Nginx)
-    redoc_url="/api/redoc",            # ReDoc bajo /api/
-    openapi_url="/api/openapi.json",   # OpenAPI schema bajo /api/
+    docs_url=None,
+    redoc_url=None,
+    openapi_url="/api/openapi.json",
 )
 
 # ===== MIDDLEWARE CORS =====
@@ -63,6 +65,31 @@ async def health_check():
         "version": "1.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
+
+
+REDOC_JS_URL = "https://cdn.jsdelivr.net/npm/redoc@2.4.0/bundles/redoc.standalone.js"
+SWAGGER_CSS_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css"
+SWAGGER_BUNDLE_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def custom_swagger_ui():
+    return get_swagger_ui_html(
+        openapi_url="/api/openapi.json",
+        title="API Deteccion Visual - Swagger UI",
+        swagger_js_url=SWAGGER_BUNDLE_URL,
+        swagger_css_url=SWAGGER_CSS_URL,
+    )
+
+
+@app.get("/api/redoc", include_in_schema=False)
+async def custom_redoc():
+    return get_redoc_html(
+        openapi_url="/api/openapi.json",
+        title="API Deteccion Visual - ReDoc",
+        redoc_js_url=REDOC_JS_URL,
+    )
+
 
 # ===== EJECUTAR SI SE LLAMA DIRECTAMENTE =====
 if __name__ == "__main__":
