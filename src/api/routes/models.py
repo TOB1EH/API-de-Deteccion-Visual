@@ -1,11 +1,15 @@
 """
-Modelos para las rutas de la API, define que hace cada URL
+Rutas para gestión de modelos de detección.
 """
 
+import logging
 from fastapi import APIRouter
 from pathlib import Path
 from ..schemas.model import ModelInfo, ModelsResponse
 
+logger = logging.getLogger(__name__)
+
+# Enrutador para las rutas de modelos, con prefijo /api/models
 router = APIRouter(
     prefix="/models",
     tags=["models"],
@@ -14,6 +18,7 @@ router = APIRouter(
 
 # Ruta donde están los modelos locales
 MODELS_PATH = Path("./models/local")
+
 @router.get("", response_model=ModelsResponse)
 async def get_models():
     """
@@ -53,10 +58,11 @@ async def get_models():
         # Ordenar alfabéticamente por nombre
         models.sort(key=lambda m: m.name)
 
+        # Retornar respuesta con total y lista de modelos
         return ModelsResponse(total=len(models), models=models)
 
     except Exception as e:
-        print(f"Error leyendo modelos: {e}")
+        logger.exception("Error leyendo modelos")
         return ModelsResponse(total=0, models=[])
 
 @router.get("/{model_name}", response_model=ModelInfo)
@@ -73,10 +79,12 @@ async def get_model(model_name: str):
         - ModelInfo con información del modelo
         - 404 si no existe
     """
+    # Construir ruta completa al modelo
     model_path = MODELS_PATH / model_name
 
     # Verificar que existe y es un archivo
     if not model_path.exists() or not model_path.is_file():
+        logger.warning("Modelo no encontrado: %s", model_name)
         return {"error": f"Modelo '{model_name}' no encontrado"}, 404
 
     # Verificar extensión válida
@@ -84,6 +92,7 @@ async def get_model(model_name: str):
         return {"error": f"Tipo de archivo no válido: {model_path.suffix}"}, 400
 
     try:
+        # Obtener tamaño del archivo
         file_size = model_path.stat().st_size
 
         return ModelInfo(
@@ -94,5 +103,5 @@ async def get_model(model_name: str):
         )
 
     except Exception as e:
-        print(f"Error obteniendo modelo: {e}")
+        logger.exception("Error obteniendo modelo")
         return {"error": "Error interno del servidor"}, 500

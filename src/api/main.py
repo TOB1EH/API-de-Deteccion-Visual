@@ -1,14 +1,22 @@
 """
 Punto de entrada de la aplicación, define las rutas y los servicios que se van a
 utilizar en la API. Es el archivo principal de la aplicación, donde se configura
-el servidor y seimportan las rutas y servicios necesarios para el funcionamiento
+el servidor y se importan las rutas y servicios necesarios para el funcionamiento
 de la API.
 """
 
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import models, detections
-from datetime import datetime
+from datetime import datetime, timezone
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # ===== CREAR APLICACIÓN FASTAPI =====
 app = FastAPI(
@@ -53,7 +61,7 @@ async def health_check():
         "status": "healthy",
         "service": "API Detección Visual",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
 
 # ===== EJECUTAR SI SE LLAMA DIRECTAMENTE =====

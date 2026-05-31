@@ -1,0 +1,118 @@
+version: '3.9'
+
+services:
+  # PostgreSQL con pgvector
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: api_detection_db_local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - ./volumes/pg_data_local:/var/lib/postgresql/data
+      # Script de inicialización de la BD
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - api-detection-net-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U detections_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SeaweedFS Master
+  seaweed-master:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweed_master_local
+    command: master -ip=seaweed-master -port=9333
+    ports:
+      - "9333:9333"
+    volumes:
+      - ./volumes/seaweed_master_local:/data
+    networks:
+      - api-detection-net-local
+
+  # SeaweedFS Volume
+  seaweed-volume:
+    image: chrislusf/seaweedfs:latest
+    container_name: seaweed_volume_local
+    # En desarrollo a veces 8080 está ocupado, lo exponemos al host en otro puerto (ej 8090)
+    # pero internamente sigue en 8080
+    command: volume -ip=seaweed-volume -port=8080 -master=seaweed-master:9333
+    ports:
+      - "8090:8080" # Exponemos al host en 8090 por si 8080 está ocupado
+    volumes:
+      - ./volumes/seaweed_volume_local:/data
+    depends_on:
+      - seaweed-master
+    networks:
+      - api-detection-net-local
+
+  # Nginx (reverse proxy local HTTP)
+  nginx:
+    image: nginx:1.31.1
+    container_name: api_detection_nginx_local
+    ports:
+      - "80:80"    # Solo HTTP para local
+    volumes:
+      # Montamos la config local sin HTTPS
+      - ./docker/nginx.local.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - db
+      - seaweed-master
+      - seaweed-volume
+      - pgadmin
+      - api
+    networks:
+      - api-detection-net-local
+    restart: unless-stopped
+
+  # pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: api_detection_pgadmin_local
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    networks:
+      - api-detection-net-local
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # API REST
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: api_detection_api_local
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SEAWEED_URL: http://seaweed-volume:8080
+      # Usamos el proxy nginx local para URLs públicas
+      SEAWEED_PUBLIC_URL: http://localhost/seaweed
+    volumes:
+      - ./models/local:/app/models/local:ro
+      - ./src:/app/src
+    depends_on:
+      - db
+      - seaweed-volume
+    networks:
+      - api-detection-net-local
+    restart: unless-stopped
+
+# Redes
+networks:
+  api-detection-net-local:
+    driver: bridge
+
+# Volúmenes
+volumes:
+  pg_data_local:
+  seaweed_master_local:
+  seaweed_volume_local:

@@ -5,9 +5,8 @@ de generar la documentación automática de la API.
 Sirve para validar que el cliente envia los datos correctos.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
-from uuid import UUID
 
 # Entrada: Lo que el Cliente envia
 
@@ -41,6 +40,9 @@ class DetectionRequest(BaseModel):
     """
     Estructura de la solicitud POST /detections
     """
+    # ConfigDict para evitar que Pydantic trate de validar campos con nombres reservados
+    model_config = ConfigDict(protected_namespaces=())
+
     image_base64: str                          # Imagen codificada en base64
     model_id: str                              # ID del modelo utilizado para la detección
     latitude: float                            # Latitud de la ubicación donde se tomó la imagen

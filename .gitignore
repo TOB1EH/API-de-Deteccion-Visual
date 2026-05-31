@@ -13,6 +13,10 @@ secrets.json
 .aws/
 .ssh/
 
+# Entorno virtual
+venv/
+.venv/
+
 # Docker
 volumes/
 .docker/
@@ -23,6 +27,13 @@ volumes/
 *.swp
 *.swo
 *~
+
+# Testing
+tests/fixtures/
+tests/test_results.json
+__pycache__/
+pytest_cache/
+.coverage
 
 # Logs
 logs/

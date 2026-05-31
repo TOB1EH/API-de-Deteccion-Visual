@@ -2,17 +2,21 @@
 Rutas para la gestión de detecciones.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 from ..schemas.detection import DetectionRequest, DetectionResponse
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 
+logger = logging.getLogger(__name__)
+
+# Enrutador para las rutas de detecciones, con prefijo /api/detections
 router = APIRouter(
     prefix="/detections",
     tags=["detections"],
-    responses={404: {"description": "Not found"}},
+    responses={404: {"description": "Not found"}}, # Respuesta común para rutas de detecciones
 )
 
 @router.post("", response_model=DetectionResponse)
@@ -38,19 +42,20 @@ async def process_detections(request: DetectionRequest):
     try:
         # Generar IDs únicos
         frame_id = str(uuid4())
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        # timestamp en formato ISO 8601 UTC (ej: 2024-06-01T12:00:00Z)
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
         # ===== PASO 1: Subir imagen a SeaweedFS =====
-        print(f"[{frame_id}] Subiendo imagen a SeaweedFS...")
+        logger.info("[%s] Subiendo imagen a SeaweedFS...", frame_id)
         image_url = seaweedfs_client.upload_image(request.image_base64, frame_id)
 
         if not image_url:
             raise ValueError("No se pudo subir la imagen a SeaweedFS")
 
-        print(f"[{frame_id}] Imagen guardada en: {image_url}")
+        logger.info("[%s] Imagen guardada en: %s", frame_id, image_url)
 
         # ===== PASO 2: Guardar frame en PostgreSQL =====
-        print(f"[{frame_id}] Guardando frame en PostgreSQL...")
+        logger.info("[%s] Guardando frame en PostgreSQL...", frame_id)
         frame_saved = db_service.save_frame(
             frame_id=frame_id,
             model_id=request.model_id,
@@ -65,10 +70,10 @@ async def process_detections(request: DetectionRequest):
         if not frame_saved:
             raise ValueError("No se pudo guardar el frame en la BD")
 
-        print(f"[{frame_id}] Frame guardado en BD")
+        logger.info("[%s] Frame guardado en BD", frame_id)
 
         # ===== PASO 3: Guardar detecciones en PostgreSQL =====
-        print(f"[{frame_id}] Guardando {len(request.detections)} detecciones...")
+        logger.info("[%s] Guardando %d detecciones...", frame_id, len(request.detections))
 
         # Convertir detecciones a formato de BD
         detections_data = []
@@ -80,9 +85,9 @@ async def process_detections(request: DetectionRequest):
                 'bbox': det.bbox.model_dump()  # Convertir Pydantic model a dict
             })
 
-        # Guardar batch
+        # Guardar batch, donde batch es una lista de detecciones asociadas al frame_id
         detections_saved = db_service.save_detections_batch(frame_id, detections_data)
-        print(f"[{frame_id}] {detections_saved} detecciones guardadas")
+        logger.info("[%s] %d detecciones guardadas", frame_id, detections_saved)
 
         # ===== PASO 4: Retornar respuesta exitosa =====
         return DetectionResponse(
@@ -95,7 +100,7 @@ async def process_detections(request: DetectionRequest):
         )
 
     except Exception as e:
-        print(f"Error en process_detections: {e}")
+        logger.exception("Error en process_detections")
         raise HTTPException(
             status_code=500,
             detail=f"Error procesando detecciones: {str(e)}"
@@ -115,14 +120,15 @@ async def get_detections(frame_id: str):
         Lista de detecciones del frame
     """
     try:
+        # Obtener detecciones desde la BD usando el frame_id
         detections = db_service.get_frame_detections(frame_id)
-
         if not detections:
             raise HTTPException(
                 status_code=404,
                 detail=f"Frame {frame_id} no encontrado"
             )
 
+        # Retornar detecciones
         return {
             "frame_id": frame_id,
             "detections_count": len(detections),
@@ -130,7 +136,7 @@ async def get_detections(frame_id: str):
         }
 
     except Exception as e:
-        print(f"Error obteniendo detecciones: {e}")
+        logger.exception("Error obteniendo detecciones")
         raise HTTPException(
             status_code=500,
             detail=f"Error: {str(e)}"

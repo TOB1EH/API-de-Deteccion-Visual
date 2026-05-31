@@ -1,13 +1,16 @@
 """
-Servicio para manejar la conexion con PostgreSQL. Capa intermedia entre
-las rutas y la base de datos, es decir, abstrae la logica de la BD de las rutas
+Servicio para manejar la conexión con PostgreSQL. Capa intermedia entre
+las rutas y la base de datos, es decir, abstrae la lógica de la BD de las rutas
 """
 
+import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Optional
 import os
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 class DatabaseService:
     """
@@ -16,7 +19,7 @@ class DatabaseService:
 
     def __init__(self):
         """
-        Inicializa conexion a BD
+        Inicializa conexión a BD
         """
         self.db_url = os.getenv(
             "DATABASE_URL",
@@ -25,20 +28,20 @@ class DatabaseService:
 
     def get_connection(self):
         """
-        Retorna una conexion a PostreSQL
+        Retorna una conexión a PostgreSQL
         """
         try:
             conn = psycopg2.connect(self.db_url)
             return conn
         except Exception as e:
-            print(f"Error al conectar a la base de datos: {e}")
+            logger.error("Error al conectar a la base de datos: %s", e)
             raise
 
     def save_frame(self, frame_id: str, model_id: str, latitude: float,
                    longitude: float, image_url: str, detections_count: int,
                    camera_id: Optional[str] = None, source: Optional[str] = None) -> bool:
         """
-        Guarda un frame en la table frames de la base de datos
+        Guarda un frame en la tabla frames de la base de datos
 
         Args:
             frame_id (str): ID unico del fotograma procesado
@@ -68,7 +71,7 @@ class DatabaseService:
                 camera_id,
                 source
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
 
             cursor.execute(query, (
@@ -80,21 +83,22 @@ class DatabaseService:
                 detections_count,
                 camera_id,
                 source
-            ))
+            )) # Ejecutar la consulta con los parámetros
 
+            # Confirmar la transacción y cerrar la conexión
             conn.commit()
             cursor.close()
             conn.close()
             return True
         except Exception as e:
-            print(f"Error al guardar el frame en la base de datos: {e}")
+            logger.error("Error al guardar el frame en la base de datos: %s", e)
             return False
 
     def save_detection(self, detection_id: str, frame_id: str, class_name: str, class_id: int,
                        confidence: float, bbox_x_min: int, bbox_y_min: int, bbox_x_max: int,
                        bbox_y_max: int) -> bool:
         """
-        Guarda una detección individual en la table detections de la base de datos
+        Guarda una detección individual en la tabla detections de la base de datos
 
         Args:
             detection_id (str): ID unico de la detección
@@ -111,8 +115,8 @@ class DatabaseService:
             bool: True si se guardó correctamente, False en caso contrario
         """
         try:
-            conn = self.get_connection()
-            cursor = conn.cursor()
+            conn = self.get_connection() # Obtener conexión a la base de datos
+            cursor = conn.cursor() # Crear un cursor para ejecutar consultas
 
             query = """
             INSERT INTO detections (
@@ -141,7 +145,7 @@ class DatabaseService:
             return True
 
         except Exception as e:
-            print(f"Error guardando detección: {e}")
+            logger.error("Error guardando detección: %s", e)
             return False
 
     def save_detections_batch(self, frame_id: str, detections_data: List[Dict]) -> int:
@@ -197,7 +201,7 @@ class DatabaseService:
                     saved_count += 1
 
                 except Exception as e:
-                    print(f"Error guardando detección individual: {e}")
+                    logger.error("Error guardando detección individual: %s", e)
                     continue
 
             conn.commit()
@@ -207,7 +211,7 @@ class DatabaseService:
             return saved_count
 
         except Exception as e:
-            print(f"Error en save_detections_batch: {e}")
+            logger.error("Error en save_detections_batch: %s", e)
             return saved_count
 
     def get_frames_by_location(self, latitude: float, longitude: float,
@@ -247,7 +251,7 @@ class DatabaseService:
             return results
 
         except Exception as e:
-            print(f"Error buscando frames: {e}")
+            logger.error("Error buscando frames: %s", e)
             return []
 
     def get_frame_detections(self, frame_id: str) -> List[Dict]:
@@ -280,7 +284,7 @@ class DatabaseService:
             return results
 
         except Exception as e:
-            print(f"Error obteniendo detecciones: {e}")
+            logger.error("Error obteniendo detecciones: %s", e)
             return []
 
 # Instancia global (singleton)

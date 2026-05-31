@@ -4,11 +4,14 @@ métodos para subir, descargar y eliminar archivos, así como para generar URLs 
 de acceso a los archivos almacenados.
 """
 
+import logging
 import requests
 import base64
 from typing import Optional
 import os
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 class SeaweedFSClient:
     """Cliente para interactuar con SeaweedFS"""
@@ -17,6 +20,7 @@ class SeaweedFSClient:
         """Inicializa cliente SeaweedFS"""
         # URL de SeaweedFS Volume
         self.seaweed_url = os.getenv("SEAWEED_URL", "http://seaweed-volume:8080")
+        self.seaweed_master_url = os.getenv("SEAWEED_MASTER_URL", "http://seaweed-master:9333")
         self.seaweed_public_url = os.getenv(
             "SEAWEED_PUBLIC_URL",
             "https://bfts2026.mooo.com/seaweed"
@@ -44,26 +48,25 @@ class SeaweedFSClient:
 
             # Subir a SeaweedFS
             response = requests.post(
-                f"{self.seaweed_url}/submit",
+                f"{self.seaweed_master_url}/submit",
                 files=files,
                 timeout=30
             )
 
-            if response.status_code == 200:
+            if response.status_code in (200, 201):
                 data = response.json()
-                # SeaweedFS retorna: {"name": "550e8400", "fid": "1,abc123"}
+                # SeaweedFS retorna: {"fid": "5,035e06afbe", "fileName": "...", ...}
                 file_id = data.get('fid')
-                file_name = data.get('name')
 
-                # Construir URL pública
-                public_url = f"{self.seaweed_public_url}/{file_id}/{file_name}"
+                # Formato estandar: /fid.ext
+                public_url = f"{self.seaweed_public_url}/{file_id}.jpg"
                 return public_url
             else:
-                print(f"Error uploading to SeaweedFS: {response.status_code} - {response.text}")
+                logger.error("Error uploading to SeaweedFS: %d - %s", response.status_code, response.text)
                 return None
 
         except Exception as e:
-            print(f"Error en SeaweedFS upload: {e}")
+            logger.exception("Error en SeaweedFS upload")
             return None
 
     def download_image(self, fid: str, file_name: str) -> Optional[bytes]:
@@ -84,11 +87,11 @@ class SeaweedFSClient:
             if response.status_code == 200:
                 return response.content
             else:
-                print(f"Error downloading from SeaweedFS: {response.status_code}")
+                logger.error("Error downloading from SeaweedFS: %d", response.status_code)
                 return None
 
         except Exception as e:
-            print(f"Error en SeaweedFS download: {e}")
+            logger.exception("Error en SeaweedFS download")
             return None
 
     def get_public_url(self, fid: str, file_name: str) -> str:
