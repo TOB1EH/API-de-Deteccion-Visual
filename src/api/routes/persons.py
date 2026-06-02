@@ -1,0 +1,113 @@
+"""
+Rutas para S5.1: Gestión de personas (CRUD básico).
+"""
+
+import logging
+from fastapi import APIRouter, HTTPException
+from uuid import uuid4
+from datetime import datetime, timezone
+from ..schemas.person import PersonCreate, PersonResponse, PersonListResponse
+from ..services.db_service import db_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/persons",
+    tags=["persons"],
+    responses={404: {"description": "Not found"}},
+)
+
+
+@router.post("", response_model=PersonResponse, status_code=201)
+async def create_person(request: PersonCreate):
+    """
+    Crea una nueva persona.
+
+    POST /api/persons
+
+    Args:
+        request: PersonCreate (name, email opcional, metadata opcional)
+
+    Retorna:
+        PersonResponse con person_id, name, email, metadata, timestamps
+    """
+    try:
+        person_id = str(uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        saved = db_service.create_person(
+            person_id=person_id,
+            name=request.name,
+            email=request.email,
+            metadata=request.metadata
+        )
+
+        if not saved:
+            raise HTTPException(
+                status_code=500,
+                detail="Error al crear la persona en la base de datos"
+            )
+
+        return PersonResponse(
+            person_id=person_id,
+            name=request.name,
+            email=request.email,
+            metadata=request.metadata or {},
+            created_at=timestamp,
+            updated_at=timestamp
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creando persona")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
+
+@router.get("", response_model=PersonListResponse)
+async def list_persons():
+    """
+    Lista todas las personas registradas.
+
+    GET /api/persons
+    """
+    try:
+        persons = db_service.list_persons()
+        return PersonListResponse(
+            total=len(persons),
+            persons=[PersonResponse(**p) for p in persons]
+        )
+    except Exception as e:
+        logger.exception("Error listando personas")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
+
+@router.get("/{person_id}", response_model=PersonResponse)
+async def get_person(person_id: str):
+    """
+    Obtiene una persona por su ID.
+
+    GET /api/persons/{person_id}
+    """
+    try:
+        person = db_service.get_person(person_id)
+        if not person:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Persona {person_id} no encontrada"
+            )
+        return PersonResponse(**person)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error obteniendo persona")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )

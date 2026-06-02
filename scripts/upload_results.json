@@ -1,0 +1,37 @@
+[
+  {
+    "image": "colapinto.jpg",
+    "name": "Colapinto",
+    "person_id": "0af04092-2b02-48d0-8d0b-2b51baa25e68",
+    "image_url": "http://localhost/seaweed/3,1056005c6e.jpg",
+    "embedding_generated": true
+  },
+  {
+    "image": "colapinto2.jpg",
+    "name": "Colapinto2",
+    "person_id": "1779c700-a490-4473-82c9-7022941672a9",
+    "image_url": "http://localhost/seaweed/4,113b2979da.jpg",
+    "embedding_generated": true
+  },
+  {
+    "image": "messi.jpg",
+    "name": "Messi",
+    "person_id": "d13c8cb5-ef08-40cb-b4ea-781aba3ee43e",
+    "image_url": "http://localhost/seaweed/7,12bf82df02.jpg",
+    "embedding_generated": true
+  },
+  {
+    "image": "ozzy.jpg",
+    "name": "Ozzy",
+    "person_id": "7689f380-802c-4417-9688-0e9cf53b9af5",
+    "image_url": "http://localhost/seaweed/7,138098716e.jpg",
+    "embedding_generated": true
+  },
+  {
+    "image": "ronaldo.jpg",
+    "name": "Ronaldo",
+    "person_id": "cf47678d-7d96-4ec5-ac70-21cfcba753fd",
+    "image_url": "http://localhost/seaweed/6,1406f8a9bd.jpg",
+    "embedding_generated": true
+  }
+]

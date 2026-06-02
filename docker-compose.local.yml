@@ -66,6 +66,7 @@ services:
       - seaweed-volume
       - pgadmin
       - api
+      - face-api
     networks:
       - api-detection-net-local
     restart: unless-stopped
@@ -106,7 +107,30 @@ services:
       - api-detection-net-local
     restart: unless-stopped
 
-# Redes
+  # Face API (DeepFace - microservicio de reconocimiento facial)
+  face-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.face_api
+    container_name: api_detection_face_api_local
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SEAWEED_URL: http://seaweed-volume:8080
+      DEEPFACE_BACKEND: Facenet
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - face_models_weights:/root/.deepface/weights
+      - ./src/face_api:/app/src/face_api
+    depends_on:
+      - db
+      - seaweed-volume
+    networks:
+      - api-detection-net-local
+    restart: unless-stopped
 networks:
   api-detection-net-local:
     driver: bridge
@@ -116,3 +140,4 @@ volumes:
   pg_data_local:
   seaweed_master_local:
   seaweed_volume_local:
+  face_models_weights:

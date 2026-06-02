@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import models, detections
+from .routes import models, detections, persons
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -46,6 +46,7 @@ app.add_middleware(
 # Estos prefijos se agregan a las rutas definidas en cada router
 app.include_router(models.router, prefix="/api")       # GET /api/models
 app.include_router(detections.router, prefix="/api")   # POST /api/detections
+app.include_router(persons.router, prefix="/api")      # POST/GET /api/persons
 
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")
