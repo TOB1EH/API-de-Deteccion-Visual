@@ -98,6 +98,7 @@ services:
       SEAWEED_PUBLIC_URL: http://localhost/seaweed
     volumes:
       - ./models/local:/app/models/local:ro
+      - ./client:/app/client:ro
       - ./src:/app/src
     depends_on:
       - db
