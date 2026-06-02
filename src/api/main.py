@@ -6,8 +6,9 @@ de la API.
 """
 
 import logging
+from pathlib import Path
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import models, detections
@@ -50,21 +51,52 @@ app.include_router(detections.router, prefix="/api")   # POST /api/detections
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")
 async def root():
-    """Health check en raíz"""
+    """Bienvenida e instrucciones de instalacion del nodo local."""
     return {
         "message": "API Detection Service OK",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "docs": "/api/docs",
+        "setup_cliente": "/setup_cliente.py",
+        "instrucciones": (
+            "Para procesar imagenes con tu propia PC, "
+            "abre tu terminal y ejecuta:"
+        ),
+        "comando_linux_mac": (
+            "curl -sO https://bfts2026.mooo.com/setup_cliente.py "
+            "&& python3 setup_cliente.py"
+        ),
+        "comando_windows": (
+            "curl -sO https://bfts2026.mooo.com/setup_cliente.py "
+            "&& python setup_cliente.py"
+        )
     }
+
 
 @app.get("/health")
 async def health_check():
     """Endpoint de healthcheck detallado"""
     return {
         "status": "healthy",
-        "service": "API Detección Visual",
+        "service": "API Deteccion Visual",
         "version": "1.0.0",
         "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
     }
+
+
+@app.get("/setup_cliente.py", include_in_schema=False)
+async def download_setup_script():
+    """Descarga el script de instalacion del nodo de inferencia local."""
+    script_path = Path("/app/client/setup_cliente.py")
+    if script_path.exists():
+        return FileResponse(
+            script_path,
+            media_type="text/plain",
+            filename="setup_cliente.py"
+        )
+    return PlainTextResponse(
+        "Error: Script de instalacion no disponible en el servidor.",
+        status_code=503
+    )
 
 
 REDOC_JS_URL = "https://cdn.jsdelivr.net/npm/redoc@2.4.0/bundles/redoc.standalone.js"
@@ -74,6 +106,9 @@ SWAGGER_BUNDLE_URL = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger
 
 @app.get("/api/docs", include_in_schema=False)
 async def custom_swagger_ui():
+    """
+    Servicio para visualizar la documentación de la API en Swagger UI.
+    """
     return get_swagger_ui_html(
         openapi_url="/api/openapi.json",
         title="API Deteccion Visual - Swagger UI",
@@ -84,6 +119,7 @@ async def custom_swagger_ui():
 
 @app.get("/api/redoc", include_in_schema=False)
 async def custom_redoc():
+    """Servicio para visualizar la documentación de la API en ReDoc."""
     return get_redoc_html(
         openapi_url="/api/openapi.json",
         title="API Deteccion Visual - ReDoc",

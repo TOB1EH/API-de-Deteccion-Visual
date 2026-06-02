@@ -3,7 +3,8 @@ Rutas para gestión de modelos de detección.
 """
 
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pathlib import Path
 from ..schemas.model import ModelInfo, ModelsResponse
 
@@ -105,3 +106,34 @@ async def get_model(model_name: str):
     except Exception as e:
         logger.exception("Error obteniendo modelo")
         return {"error": "Error interno del servidor"}, 500
+
+
+@router.get("/{model_name}/download")
+async def download_model(model_name: str):
+    """
+    Descarga el archivo fisico de un modelo YOLO.
+
+    GET /api/models/yolo11n.pt/download
+
+    Args:
+        model_name: nombre del archivo del modelo (ej: yolo11n.pt)
+
+    Retorna:
+        El archivo .pt como descarga binaria
+        404 si no existe
+    """
+    model_path = MODELS_PATH / model_name
+
+    if not model_path.exists() or not model_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Modelo '{model_name}' no encontrado")
+
+    if model_path.suffix not in ['.pt', '.weights', '.onnx']:
+        raise HTTPException(status_code=400, detail=f"Tipo de archivo no valido: {model_path.suffix}")
+
+    logger.info("Descargando modelo: %s (%d bytes)", model_name, model_path.stat().st_size)
+
+    return FileResponse(
+        path=model_path,
+        media_type="application/octet-stream",
+        filename=model_name
+    )
