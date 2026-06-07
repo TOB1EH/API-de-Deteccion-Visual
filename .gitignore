@@ -42,3 +42,6 @@ logs/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Docker Inferencia en YOLO
+inference-server/
