@@ -3,6 +3,7 @@ Servicio para manejar la conexión con PostgreSQL. Capa intermedia entre
 las rutas y la base de datos, es decir, abstrae la lógica de la BD de las rutas
 """
 
+import json
 import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -285,6 +286,63 @@ class DatabaseService:
 
         except Exception as e:
             logger.error("Error obteniendo detecciones: %s", e)
+            return []
+
+    def create_person(self, person_id: str, name: str, email: str = None,
+                      metadata: dict = None) -> bool:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            query = """
+            INSERT INTO persons (person_id, name, email, metadata)
+            VALUES (%s, %s, %s, %s)
+            """
+            cursor.execute(query, (person_id, name, email,
+                                   json.dumps(metadata) if metadata else None))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error("Error creando persona: %s", e)
+            return False
+
+    def get_person(self, person_id: str) -> Optional[dict]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            query = """
+            SELECT person_id::TEXT, name, email, metadata,
+                   created_at::TEXT, updated_at::TEXT
+            FROM persons
+            WHERE person_id = %s
+            """
+            cursor.execute(query, (person_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return dict(result) if result else None
+        except Exception as e:
+            logger.error("Error obteniendo persona: %s", e)
+            return None
+
+    def list_persons(self) -> list[dict]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            query = """
+            SELECT person_id::TEXT, name, email, metadata,
+                   created_at::TEXT, updated_at::TEXT
+            FROM persons
+            ORDER BY name ASC
+            """
+            cursor.execute(query)
+            results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [dict(r) for r in results]
+        except Exception as e:
+            logger.error("Error listando personas: %s", e)
             return []
 
 # Instancia global (singleton)

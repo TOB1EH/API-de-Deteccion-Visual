@@ -123,11 +123,63 @@ ALTER TABLE detections
     CHECK (bbox_x_min < bbox_x_max AND bbox_y_min < bbox_y_max);
 
 -- ============================================================================
+-- TABLA: persons (personas registradas para reconocimiento facial)
+-- Propósito: Almacenar datos de personas para S5.1, S5.2 y S5.3
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS persons (
+    person_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+COMMENT ON TABLE persons IS 'Personas registradas para reconocimiento facial.';
+
+-- ============================================================================
+-- TABLA: face_embeddings (vectores faciales de personas)
+-- Propósito: Almacenar embeddings faciales generados por DeepFace (S5.2)
+-- Relación: N face_embeddings → 1 person (FK person_id)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS face_embeddings (
+    embedding_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    person_id UUID NOT NULL,
+    CONSTRAINT fk_face_embeddings_person_id
+        FOREIGN KEY (person_id) REFERENCES persons(person_id) ON DELETE CASCADE,
+    embedding vector(128) NOT NULL,
+    confidence FLOAT,
+    CONSTRAINT check_embedding_confidence CHECK (confidence >= 0.0 AND confidence <= 1.0),
+    image_url TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+COMMENT ON TABLE face_embeddings IS 'Embeddings faciales generados por DeepFace. Vinculados a person_id con cascada.';
+
+-- ============================================================================
+-- ÍNDICES para persons y face_embeddings
+-- ============================================================================
+CREATE INDEX IF NOT EXISTS idx_face_embeddings_person_id
+    ON face_embeddings(person_id);
+COMMENT ON INDEX idx_face_embeddings_person_id IS 'Obtener todos los embeddings de una persona.';
+
+-- Índice IVFFLAT para búsqueda vectorial aproximada (S5.3)
+CREATE INDEX IF NOT EXISTS idx_face_embeddings_ivfflat
+    ON face_embeddings
+    USING ivfflat (embedding vector_cosine_ops)
+    WITH (lists = 100);
+COMMENT ON INDEX idx_face_embeddings_ivfflat IS 'Búsqueda aproximada de rostros similares (distancia cosine).';
+
+-- ============================================================================
 -- RESULTADO FINAL
 -- ============================================================================
 -- ✓ Tabla frames: almacena fotogramas con geolocalización + metadatos
 -- ✓ Tabla detections: almacena objetos detectados con bbox + confianza
+-- ✓ Tabla persons: almacena personas registradas (S5.1)
+-- ✓ Tabla face_embeddings: almacena vectores faciales 128D (S5.2/S5.3)
 -- ✓ Relación: frame_id FK con CASCADE (integridad referencial)
+-- ✓ Relación: person_id FK con CASCADE (integridad referencial)
 -- ✓ Índices: optimizados para queries S2, S3, S4, S5
+-- ✓ Índice IVFFLAT: búsqueda facial aproximada (S5.3)
 -- ✓ Constraints: validación de datos (confidence 0-1, bbox válido, etc.)
 -- ============================================================================
