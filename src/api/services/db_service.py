@@ -255,6 +255,90 @@ class DatabaseService:
             logger.error("Error buscando frames: %s", e)
             return []
 
+    def get_frame_by_id(self, frame_id: str) -> Optional[Dict]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            query = "SELECT * FROM frames WHERE frame_id = %s"
+            cursor.execute(query, (frame_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return dict(result) if result else None
+        except Exception as e:
+            logger.error("Error obteniendo frame: %s", e)
+            return None
+
+    def search_frames(self, filters: Dict, limit: int = 50, offset: int = 0) -> List[Dict]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            conditions = []
+            params = []
+
+            if "lat_min" in filters and "lat_max" in filters:
+                conditions.append("latitude BETWEEN %s AND %s")
+                params.extend([filters["lat_min"], filters["lat_max"]])
+            if "lon_min" in filters and "lon_max" in filters:
+                conditions.append("longitude BETWEEN %s AND %s")
+                params.extend([filters["lon_min"], filters["lon_max"]])
+            if "classes" in filters:
+                placeholders = ",".join(["%s"] * len(filters["classes"]))
+                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
+                params.extend(filters["classes"])
+
+            where = " AND ".join(conditions) if conditions else "TRUE"
+            query = f"""
+                SELECT frame_id, model_id, latitude, longitude, image_url,
+                       detections_count, camera_id, source, created_at
+                FROM frames
+                WHERE {where}
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            params.extend([limit, offset])
+
+            cursor.execute(query, tuple(params))
+            results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            return [dict(r) for r in results]
+        except Exception as e:
+            logger.error("Error buscando frames: %s", e)
+            return []
+
+    def count_frames(self, filters: Dict) -> int:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            conditions = []
+            params = []
+
+            if "lat_min" in filters and "lat_max" in filters:
+                conditions.append("latitude BETWEEN %s AND %s")
+                params.extend([filters["lat_min"], filters["lat_max"]])
+            if "lon_min" in filters and "lon_max" in filters:
+                conditions.append("longitude BETWEEN %s AND %s")
+                params.extend([filters["lon_min"], filters["lon_max"]])
+            if "classes" in filters:
+                placeholders = ",".join(["%s"] * len(filters["classes"]))
+                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
+                params.extend(filters["classes"])
+
+            where = " AND ".join(conditions) if conditions else "TRUE"
+            query = f"SELECT COUNT(*) FROM frames WHERE {where}"
+
+            cursor.execute(query, tuple(params))
+            count = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error("Error contando frames: %s", e)
+            return 0
+
     def get_frame_detections(self, frame_id: str) -> List[Dict]:
         """
         Obtiene todas las detecciones de un frame

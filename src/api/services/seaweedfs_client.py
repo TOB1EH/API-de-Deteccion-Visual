@@ -39,6 +39,9 @@ class SeaweedFSClient:
         """
         try:
             # Decodificar base64 a bytes
+            # Limpiar prefijo data URI si existe (ej: "data:image/jpeg;base64,...")
+            if image_base64.startswith("data:"):
+                image_base64 = image_base64.split(",", 1)[1]
             image_bytes = base64.b64decode(image_base64)
 
             # Preparar request a SeaweedFS
