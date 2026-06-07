@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    g++ \
+    libgl1 \
+    libglib2.0-0 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.face_api.txt .
+RUN pip install --no-cache-dir -r requirements.face_api.txt
+
+RUN mkdir -p /root/.deepface/weights
+
+COPY src/face_api/ ./src/face_api/
+
+EXPOSE 8000
+
+CMD ["uvicorn", "src.face_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
