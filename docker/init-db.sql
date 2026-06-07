@@ -127,7 +127,7 @@ ALTER TABLE detections
 -- ============================================================================
 -- ✓ Tabla frames: almacena fotogramas con geolocalización + metadatos
 -- ✓ Tabla detections: almacena objetos detectados con bbox + confianza
--- ✓ Relación: frame_id FK con CASCADE (integridad referencial)
+-- ✓ Relación: frame_id FK con CASCADE
 -- ✓ Índices: optimizados para queries S2, S3, S4, S5
 -- ✓ Constraints: validación de datos (confidence 0-1, bbox válido, etc.)
 -- ============================================================================

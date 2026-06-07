@@ -3,6 +3,7 @@ Servicio para manejar la conexión con PostgreSQL. Capa intermedia entre
 las rutas y la base de datos, es decir, abstrae la lógica de la BD de las rutas
 """
 
+import json
 import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -287,5 +288,90 @@ class DatabaseService:
             logger.error("Error obteniendo detecciones: %s", e)
             return []
 
+    def get_frame_by_id(self, frame_id: str) -> Optional[Dict]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            query = "SELECT * FROM frames WHERE frame_id = %s"
+            cursor.execute(query, (frame_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return dict(result) if result else None
+        except Exception as e:
+            logger.error("Error obteniendo frame: %s", e)
+            return None
+
+    def search_frames(self, lat_min: float, lat_max: float, lon_min: float, 
+                     lon_max: float, class_name: Optional[str] = None,
+                     limit: int = 50, offset: int = 0) -> List[Dict]:
+        """
+        Implementación de S4: Búsqueda filtrada de fotogramas.
+        Cumple con los requisitos de parámetros obligatorios y formato de salida.
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            
+            # Consulta base con filtros geográficos obligatorios
+            query = """
+                SELECT 
+                    f.frame_id, 
+                    f.latitude, f.longitude, f.image_url as original_url,
+                    f.camera_id, f.source, f.created_at,
+                    COALESCE(json_agg(d.*) FILTER (WHERE d.detection_id IS NOT NULL), '[]') as detections
+                FROM frames f
+                LEFT JOIN detections d ON f.frame_id = d.frame_id
+                WHERE f.latitude BETWEEN %s AND %s 
+                  AND f.longitude BETWEEN %s AND %s
+            """
+            params = [lat_min, lat_max, lon_min, lon_max]
+
+            if class_name:
+                query += " AND d.class_name = %s"
+                params.append(class_name)
+
+            query += " GROUP BY f.frame_id ORDER BY f.created_at DESC LIMIT %s OFFSET %s"
+            params.extend([limit, offset])
+            
+            cursor.execute(query, tuple(params))
+            results = cursor.fetchall()
+            
+            # Formatear la salida para que coincida con el PDF pág 9
+            formatted_results = []
+            for row in results:
+                formatted_results.append({
+                    "frameId": row['frame_id'],
+                    "imageURL": f"/api/frames/{row['frame_id']}", 
+                    "metadata": {
+                        "latitude": row['latitude'],
+                        "longitude": row['longitude'],
+                        "camera_id": row['camera_id'],
+                        "source": row['source'],
+                        "created_at": str(row['created_at'])
+                    },
+                    "detections": row['detections']
+                })
+            
+            cursor.close()
+            conn.close()
+            return formatted_results
+        except Exception as e:
+            logger.error("Error en búsqueda S4: %s", e)
+            return []
+
+    def count_frames(self, lat_min: float, lat_max: float, lon_min: float, lon_max: float) -> int:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            query = "SELECT COUNT(*) FROM frames WHERE latitude BETWEEN %s AND %s AND longitude BETWEEN %s AND %s"
+            cursor.execute(query, (lat_min, lat_max, lon_min, lon_max))
+            count = cursor.fetchone()[0]
+            cursor.close()
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error("Error contando frames: %s", e)
+            return 0
 # Instancia global (singleton)
 db_service = DatabaseService()

@@ -69,25 +69,28 @@ class SeaweedFSClient:
             logger.exception("Error en SeaweedFS upload")
             return None
 
-    def download_image(self, fid: str, file_name: str) -> Optional[bytes]:
+    def download_image(self, fid: str, file_name: str = "") -> Optional[bytes]:
         """
         Descarga una imagen desde SeaweedFS
 
         Args:
-            fid: File ID de SeaweedFS (ej: "1,abc123")
-            file_name: Nombre del archivo
+            fid: File ID de SeaweedFS (ej: "6,0149f1f8e2")
+            file_name: Nombre del archivo (opcional)
 
         Returns:
             Bytes de la imagen, o None si error
         """
         try:
-            url = f"{self.seaweed_url}/{fid}/{file_name}"
+            if file_name:
+                url = f"{self.seaweed_url}/{fid}/{file_name}"
+            else:
+                url = f"{self.seaweed_url}/{fid}"
             response = requests.get(url, timeout=30)
 
             if response.status_code == 200:
                 return response.content
             else:
-                logger.error("Error downloading from SeaweedFS: %d", response.status_code)
+                logger.error("Error downloading from SeaweedFS: %d %s", response.status_code, url)
                 return None
 
         except Exception as e:
