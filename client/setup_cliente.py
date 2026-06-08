@@ -436,6 +436,13 @@ def cmd_infer(args):
 # COMANDO: frames
 # ==============================================================================
 def cmd_frames_list(args):
+    if (args.lat_min is None) != (args.lat_max is None):
+        print_error("Debes especificar ambos: --lat-min Y --lat-max (o ninguno)")
+        sys.exit(1)
+    if (args.lon_min is None) != (args.lon_max is None):
+        print_error("Debes especificar ambos: --lon-min Y --lon-max (o ninguno)")
+        sys.exit(1)
+
     params = []
     if args.clases:
         params.append(f"clases={args.clases}")
@@ -449,14 +456,28 @@ def cmd_frames_list(args):
     query = "?" + "&".join(params) if params else ""
     data = api_get(f"frames/search{query}")
 
-    print(f"\n{Colors.BOLD}Frames encontrados: {data['total']}{Colors.ENDC}\n")
+    total = data["total"]
+    showing = min(args.limit, total - args.offset) if args.offset < total else 0
+    print(f"\n{Colors.BOLD}Frames encontrados: {total} (mostrando {showing}){Colors.ENDC}\n")
     for f in data["frames"]:
         dets = f["detections"]
         clases = ", ".join(set(d["class_name"] for d in dets)) if dets else "sin detecciones"
         print(f"  {Colors.OKCYAN}{f['frame_id']}{Colors.ENDC}")
         print(f"    modelo: {f['model_id']}  |  detecciones: {f['detections_count']}")
+        print(f"    coordenadas: {f['latitude']}, {f['longitude']}")
+        print(f"    imagen: {f['image_url']}")
+        if f.get("metadata"):
+            print(f"    metadata: {json.dumps(f['metadata'], ensure_ascii=False)}")
         print(f"    clases: {clases}")
         print(f"    creado: {f['created_at']}")
+        if dets:
+            print(f"    detecciones:")
+            for d in dets:
+                bbox = d["bbox"]
+                print(f"      [{d['class_name']}]  "
+                      f"id={d['detection_id'][:8]}  "
+                      f"conf={d['confidence']:.2f}  "
+                      f"bbox=({bbox['x_min']},{bbox['y_min']},{bbox['x_max']},{bbox['y_max']})")
         print()
 
 
@@ -468,15 +489,29 @@ def cmd_frames_get(args):
         print_error(f"Error {e.code}: Frame no encontrado")
         sys.exit(1)
 
+    if args.thumbnail:
+        try:
+            from PIL import Image
+            from io import BytesIO
+        except ImportError:
+            print_error("Pillow no esta instalado. Ejecuta: pip install Pillow")
+            sys.exit(1)
+        img = Image.open(BytesIO(image_bytes))
+        img.thumbnail((300, 300))
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        image_bytes = buffer.getvalue()
+
     extension = ".jpg"
     if args.output:
         output_path = args.output
     else:
-        output_path = f"{args.frame_id}{extension}"
+        suffix = "_thumb" if args.thumbnail else ""
+        output_path = f"{args.frame_id}{suffix}{extension}"
 
     with open(output_path, "wb") as f:
         f.write(image_bytes)
-    print_ok(f"Imagen guardada: {output_path}")
+    print_ok(f"Imagen guardada: {output_path} ({len(image_bytes)} bytes)")
 
 
 def cmd_frames_annotate(args):
@@ -648,6 +683,7 @@ Variables de entorno:
 
     frames_get = frames_sub.add_parser("get", help="Descargar imagen de un fotograma")
     frames_get.add_argument("frame_id", help="ID del fotograma")
+    frames_get.add_argument("--thumbnail", "-t", action="store_true", help="Descargar thumbnail (300px, mas rapido)")
     frames_get.add_argument("--output", "-o", help="Ruta de salida (default: <frame_id>.jpg)")
 
     frames_annotate = frames_sub.add_parser("annotate", help="Descargar imagen con detecciones marcadas")

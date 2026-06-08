@@ -6,7 +6,7 @@ CLI para procesar imagenes con YOLO en tu PC y almacenar resultados en el backen
 
 - Python 3.8+
 - Docker
-- Pillow (solo para `frames annotate`): `pip install Pillow`
+- Pillow (para `frames annotate` y `frames get --thumbnail`): `pip install Pillow`
 
 ## Instalacion
 
@@ -45,27 +45,36 @@ python3 setup_cliente.py models list
 python3 setup_cliente.py models info yolo11n.pt
 ```
 
-### Buscar fotogramas
+### Buscar fotogramas (S4)
 
 ```bash
 python3 setup_cliente.py frames list --clases person --limit 10
 ```
 
+Muestra por cada fotograma: frame_id, modelo, coordenadas, URL de imagen, metadatos, clases detectadas y detalle de cada deteccion (confidence, bbox, detection_id).
+
 Filtros:
 - `--clases`: filtrar por clase separada por comas (person,car,cat)
-- `--lat-min` / `--lat-max`: rango de latitud
-- `--lon-min` / `--lon-max`: rango de longitud
+- `--lat-min` / `--lat-max`: rango de latitud (ambos obligatorios si se usa uno)
+- `--lon-min` / `--lon-max`: rango de longitud (ambos obligatorios si se usa uno)
 - `--limit`: maximo resultados (default: 10, max: 200)
 - `--offset`: desplazamiento para paginacion
 
-### Descargar imagen de un fotograma
+Nota: Los filtros de latitud y longitud requieren el par completo (min + max). Si solo se pasa uno, el script muestra un error y se detiene.
+
+### Descargar imagen de un fotograma (S3)
 
 ```bash
+# Descargar imagen original
 python3 setup_cliente.py frames get <frame_id>
+
+# Descargar thumbnail (300px, mas rapido)
+python3 setup_cliente.py frames get <frame_id> --thumbnail
 ```
 
 Opciones:
 - `--output` / `-o`: ruta de salida personalizada
+- `--thumbnail` / `-t`: descarga miniatura de 300px redimensionada localmente con Pillow
 
 ### Descargar imagen con detecciones marcadas
 
@@ -114,6 +123,21 @@ API_BASE=http://localhost python3 setup_cliente.py frames list
 | `MODELS_DIR` | `./modelos` | Directorio de modelos YOLO |
 | `INFER_URL` | `http://localhost:8001/infer` | URL del servidor de inferencia |
 
+## Referencia rapida de subcomandos
+
+| Comando | Subcomando | Descripcion |
+|---|---|---|
+| `install` | - | Descarga modelos e inicia contenedor YOLO local |
+| `models` | `list` | Lista modelos disponibles en el backend |
+| `models` | `info <nombre>` | Detalle de un modelo (tamaño, tipo, ruta) |
+| `infer` | `<imagen>` | Infiere localmente y sube al backend |
+| `frames` | `list` | Busca fotogramas con filtros (S4) |
+| `frames` | `get <id>` | Descarga imagen de un fotograma (S3) |
+| `frames` | `annotate <id>` | Descarga imagen con bounding boxes dibujados |
+| `persons` | `list` | Lista personas registradas |
+| `persons` | `create <nombre>` | Crea una nueva persona |
+| `persons` | `get <id>` | Obtiene detalle de una persona |
+
 ## Solucion de problemas
 
 **Error: Conexion rechazada en localhost:8001**
@@ -124,3 +148,6 @@ Ejecuta `pip install Pillow` para el comando `frames annotate`.
 
 **Error: 404 en los comandos**
 Verifica que `API_BASE` este correcto. Para pruebas locales debe ser `http://localhost`.
+
+**Error: Debes especificar ambos: --lat-min Y --lat-max (o ninguno)**
+Los filtros geograficos requieren el par completo de minimo y maximo. Corrige el comando agregando ambos valores.
