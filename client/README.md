@@ -38,7 +38,11 @@ Parametros opcionales:
 ### Consultar modelos disponibles
 
 ```bash
-python3 setup_cliente.py models
+# Listar todos los modelos
+python3 setup_cliente.py models list
+
+# Informacion detallada de un modelo especifico
+python3 setup_cliente.py models info yolo11n.pt
 ```
 
 ### Buscar fotogramas

@@ -318,6 +318,22 @@ def cmd_models():
         print(f"  {m['name']:<25} {size_mb:.1f} MB    {m.get('type', 'yolo')}")
 
 
+def cmd_models_info(model_name):
+    try:
+        data = api_get(f"models/{model_name}")
+    except urllib.error.HTTPError as e:
+        print_error(f"Error {e.code}: Modelo '{model_name}' no encontrado")
+        sys.exit(1)
+
+    size_mb = data["size"] / (1024 * 1024)
+    print(f"\n{Colors.BOLD}Informacion del modelo:{Colors.ENDC}\n")
+    print(f"  Nombre: {data['name']}")
+    print(f"  Tamaño: {size_mb:.1f} MB")
+    print(f"  Tipo:   {data['type']}")
+    print(f"  Ruta:   {data['path']}")
+    print()
+
+
 # ==============================================================================
 # COMANDO: infer
 # ==============================================================================
@@ -581,7 +597,8 @@ def main():
         epilog="""
 Ejemplos:
   python3 setup_cliente.py install
-  python3 setup_cliente.py models
+  python3 setup_cliente.py models list
+  python3 setup_cliente.py models info yolo11n.pt
   python3 setup_cliente.py infer foto.jpg --model yolo11n.pt
   python3 setup_cliente.py frames list --clases person
   python3 setup_cliente.py frames get <frame_id>
@@ -601,7 +618,11 @@ Variables de entorno:
     subparsers.add_parser("install", help="Descarga modelos y levanta contenedor YOLO")
 
     # models
-    subparsers.add_parser("models", help="Lista modelos disponibles en el backend")
+    models_parser = subparsers.add_parser("models", help="Operaciones con modelos")
+    models_sub = models_parser.add_subparsers(dest="models_subcommand", help="Subcomando")
+    models_sub.add_parser("list", help="Lista modelos disponibles en el backend")
+    models_info = models_sub.add_parser("info", help="Informacion detallada de un modelo")
+    models_info.add_argument("model_name", help="Nombre del modelo (ej: yolo11n.pt)")
 
     # infer
     infer_parser = subparsers.add_parser("infer", help="Infere imagen localmente y sube al backend")
@@ -652,7 +673,12 @@ Variables de entorno:
     if args.command == "install":
         cmd_install()
     elif args.command == "models":
-        cmd_models()
+        if args.models_subcommand == "list":
+            cmd_models()
+        elif args.models_subcommand == "info":
+            cmd_models_info(args.model_name)
+        else:
+            models_parser.print_help()
     elif args.command == "infer":
         cmd_infer(args)
     elif args.command == "frames":
