@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Reconocimiento facial desde una imagen local.
-Sube la imagen a SeaweedFS y la reconoce contra la BD.
+Sube la imagen a SeaweedFS y la reconoce contra la BD via endpoint S5.3.
+>>>>>>> Stashed changes
 
 Uso:
     python3 scripts/face_recognition_local.py ruta/a/mi/foto.jpg [threshold]
@@ -10,8 +11,8 @@ Ejemplo:
     python3 scripts/face_recognition_local.py ~/Escritorio/foto_prueba.jpg 0.5
 
 Requiere:
-    - Servicios Docker levantados
-    - pip install requests
+    - Servicios Docker levantados (api, face-api, seaweed, db, nginx)
+>>>>>>> Stashed changes
 """
 
 import sys
@@ -66,6 +67,7 @@ def main():
     if result.get("recognized"):
         for match in result["matches"]:
             print(f"\n  RECONOCIDO: {match['name']}")
+            print(f"  Persona ID: {match['person_id']}")
             print(f"  Confianza: {match['confidence']:.4f}")
             print(f"  Distancia: {match['distance']:.4f}")
     else:
