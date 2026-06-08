@@ -37,3 +37,4 @@ class RecognitionResponse(BaseModel):
     matches: list[RecognitionMatch]
     threshold: float
     image_url: str
+    facial_area: Optional[dict] = None
