@@ -3,7 +3,10 @@
 =============================================================================
 Script de Pruebas Automatizadas: API de Detección Visual (Fase 2)
 =============================================================================
-Este script valida el funcionamiento de los endpoints S1 y S2 en local o remota.
+Valida la integración de los servicios base (S1, S2) y la infraestructura.
+Verifica que la persistencia requerida para S3 y S4 se realice correctamente
+tras una ejecución de inferencia, asegurando que los identificadores únicos 
+(frameId, modelId) mantengan la trazabilidad de los datos.
 
 Flujo:
 1. Verifica que los servicios estén vivos (Health check)
@@ -97,20 +100,18 @@ class ApiTester:
         if env == "local":
             self.api_url = "http://localhost/api"
             self.base_url = "http://localhost"
-            
-            # Credenciales de localhost (definidas en .env)
-            self.db_host = "localhost"
-            self.db_port = 5433
-            self.db_user = "detections_user"
-            self.db_pass = "secure_pwd_local"
-            self.db_name = "detections_db"
-            
+
+            self.db_host = os.getenv("DB_HOST", "localhost")
+            self.db_port = int(os.getenv("DB_PORT", "5432"))
+            self.db_user = os.getenv("POSTGRES_USER", "usuario_bd")
+            self.db_pass = os.getenv("POSTGRES_PASSWORD", "password_seguro_bd")
+            self.db_name = os.getenv("POSTGRES_DB", "nombre_bd")
+
         else:
             host = host or "bfts2026.mooo.com"
             self.api_url = f"https://{host}/api"
             self.base_url = f"https://{host}"
-            
-            # Credenciales remotas
+
             self.db_host = host
             self.db_port = 5432
             self.db_user = "detections_user"

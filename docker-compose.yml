@@ -109,6 +109,8 @@ services:
     volumes:
       # Montar carpeta de modelos (solo lectura)
       - ./models/local:/app/models/local:ro
+      # Montar script de instalacion del cliente
+      - ./client:/app/client:ro
       # Montar código (para live reload en desarrollo)
       - ./src:/app/src
     depends_on:

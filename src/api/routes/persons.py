@@ -1,7 +1,6 @@
 """
 Rutas para S5.1: Gestión de personas (CRUD básico).
 """
-
 import logging
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
@@ -67,27 +66,6 @@ async def create_person(request: PersonCreate):
         )
 
 
-@router.get("", response_model=PersonListResponse)
-async def list_persons():
-    """
-    Lista todas las personas registradas.
-
-    GET /api/persons
-    """
-    try:
-        persons = db_service.list_persons()
-        return PersonListResponse(
-            total=len(persons),
-            persons=[PersonResponse(**p) for p in persons]
-        )
-    except Exception as e:
-        logger.exception("Error listando personas")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error interno: {str(e)}"
-        )
-
-
 @router.get("/{person_id}", response_model=PersonResponse)
 async def get_person(person_id: str):
     """
@@ -107,6 +85,27 @@ async def get_person(person_id: str):
         raise
     except Exception as e:
         logger.exception("Error obteniendo persona")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
+
+@router.get("", response_model=PersonListResponse)
+async def list_persons():
+    """
+    Lista todas las personas registradas.
+
+    GET /api/persons
+    """
+    try:
+        persons = db_service.list_persons()
+        return PersonListResponse(
+            total=len(persons),
+            persons=[PersonResponse(**p) for p in persons]
+        )
+    except Exception as e:
+        logger.exception("Error listando personas")
         raise HTTPException(
             status_code=500,
             detail=f"Error interno: {str(e)}"
