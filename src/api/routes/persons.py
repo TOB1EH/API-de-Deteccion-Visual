@@ -1,6 +1,3 @@
-"""
-Rutas para S5.1: Gestión de personas (CRUD básico).
-"""
 import logging
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
@@ -19,24 +16,14 @@ router = APIRouter(
 
 @router.post("", response_model=PersonResponse, status_code=201)
 async def create_person(request: PersonCreate):
-    """
-    Crea una nueva persona.
-
-    POST /api/persons
-
-    Args:
-        request: PersonCreate (name, email opcional, metadata opcional)
-
-    Retorna:
-        PersonResponse con person_id, name, email, metadata, timestamps
-    """
     try:
         person_id = str(uuid4())
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        name = f"{request.nombre} {request.apellido}"
 
         saved = db_service.create_person(
             person_id=person_id,
-            name=request.name,
+            name=name,
             email=request.email,
             metadata=request.metadata
         )
@@ -49,7 +36,8 @@ async def create_person(request: PersonCreate):
 
         return PersonResponse(
             person_id=person_id,
-            name=request.name,
+            nombre=request.nombre,
+            apellido=request.apellido,
             email=request.email,
             metadata=request.metadata or {},
             created_at=timestamp,
@@ -68,11 +56,6 @@ async def create_person(request: PersonCreate):
 
 @router.get("/{person_id}", response_model=PersonResponse)
 async def get_person(person_id: str):
-    """
-    Obtiene una persona por su ID.
-
-    GET /api/persons/{person_id}
-    """
     try:
         person = db_service.get_person(person_id)
         if not person:
@@ -93,11 +76,6 @@ async def get_person(person_id: str):
 
 @router.get("", response_model=PersonListResponse)
 async def list_persons():
-    """
-    Lista todas las personas registradas.
-
-    GET /api/persons
-    """
     try:
         persons = db_service.list_persons()
         return PersonListResponse(

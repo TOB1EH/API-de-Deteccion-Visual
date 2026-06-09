@@ -465,6 +465,10 @@ def cmd_frames_list(args):
         params.extend([f"lat_min={args.lat_min}", f"lat_max={args.lat_max}"])
     if args.lon_min is not None:
         params.extend([f"lon_min={args.lon_min}", f"lon_max={args.lon_max}"])
+    if args.camera_id:
+        params.append(f"camera_id={args.camera_id}")
+    if args.source:
+        params.append(f"source={args.source}")
     params.append(f"limit={args.limit}")
     params.append(f"offset={args.offset}")
 
@@ -597,7 +601,7 @@ def cmd_persons_list():
     print(f"\n{Colors.BOLD}Personas registradas: {data['total']}{Colors.ENDC}\n")
     for p in data["persons"]:
         print(f"  {Colors.OKCYAN}{p['person_id']}{Colors.ENDC}")
-        print(f"    nombre: {p['name']}")
+        print(f"    nombre: {p['nombre']} {p['apellido']}")
         if p.get("email"):
             print(f"    email: {p['email']}")
         print(f"    creado: {p['created_at']}")
@@ -605,7 +609,7 @@ def cmd_persons_list():
 
 
 def cmd_persons_create(args):
-    payload = {"name": args.name}
+    payload = {"nombre": args.nombre, "apellido": args.apellido}
     if args.email:
         payload["email"] = args.email
     if args.metadata:
@@ -618,7 +622,7 @@ def cmd_persons_create(args):
     result = api_post("persons", payload)
     print_ok(f"Persona creada:")
     print(f"  ID:   {result['person_id']}")
-    print(f"  Nombre: {result['name']}")
+    print(f"  Nombre: {result['nombre']} {result['apellido']}")
     print(f"  Email: {result.get('email', '-')}")
 
 
@@ -630,7 +634,7 @@ def cmd_persons_get(args):
         sys.exit(1)
 
     print(f"\n  ID:   {Colors.OKCYAN}{person['person_id']}{Colors.ENDC}")
-    print(f"  Nombre: {person['name']}")
+    print(f"  Nombre: {person['nombre']} {person['apellido']}")
     print(f"  Email: {person.get('email', '-')}")
     print(f"  Metadata: {person.get('metadata', {})}")
     print(f"  Creado: {person['created_at']}")
@@ -681,10 +685,9 @@ def cmd_faces_embed(args):
 
     print_ok(f"Embedding generado:")
     print(f"  Embedding ID: {result['embedding_id']}")
-    print(f"  Persona ID: {result.get('person_id', person_id)}")
-    print(f"  Confianza: {result.get('confidence', 'N/A')}")
+    print(f"  Persona ID: {result['person_id']}")
     print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
-    print(f"  Estado: {result['status']}")
+    print(f"  Procesadas: {result['processed_images']}, Validas: {result['valid_embeddings']}, Rechazadas: {result['rejected_images']}")
 
 
 def cmd_faces_recognize(args):
@@ -747,11 +750,12 @@ def cmd_faces_recognize(args):
         w = facial_area["w"]
         h = facial_area["h"]
 
-        if result.get("recognized"):
-            match = result["matches"][0]
-            name = match["name"]
-            confianza = match["confidence"]
-            label = f"{name} ({confianza:.2f})"
+        if result.get("person_id"):
+            nombre = result.get("nombre", "")
+            apellido = result.get("apellido", "")
+            full_name = f"{nombre} {apellido}".strip()
+            confianza = result.get("confidence", 0.0)
+            label = f"{full_name} ({confianza:.2f})"
 
             draw.rectangle([x, y, x + w, y + h], outline="#00FF00", width=4)
             tw = draw.textlength(label, font=font)
@@ -768,14 +772,15 @@ def cmd_faces_recognize(args):
     img.save(annotated_path, "JPEG", quality=95)
     print_ok(f"Imagen anotada guardada: {annotated_path}")
 
-    if result.get("recognized"):
+    if result.get("person_id"):
+        nombre = result.get("nombre", "")
+        apellido = result.get("apellido", "")
+        full_name = f"{nombre} {apellido}".strip()
         print()
-        for match in result["matches"]:
-            print(f"  {Colors.OKGREEN}RECONOCIDO:{Colors.ENDC} {match['name']}")
-            print(f"  Persona ID: {match['person_id']}")
-            print(f"  Confianza: {match['confidence']:.4f}")
-            print(f"  Distancia coseno: {match['distance']:.4f}")
-            print()
+        print(f"  {Colors.OKGREEN}RECONOCIDO:{Colors.ENDC} {full_name}")
+        print(f"  Persona ID: {result['person_id']}")
+        print(f"  Confianza: {result['confidence']:.4f}")
+        print()
     else:
         print(f"\n  {Colors.WARNING}No reconocido{Colors.ENDC} (ninguna coincidencia supera threshold={threshold})")
 
@@ -797,7 +802,7 @@ Ejemplos:
   python3 setup_cliente.py frames get <frame_id>
   python3 setup_cliente.py frames annotate <frame_id>
   python3 setup_cliente.py persons list
-  python3 setup_cliente.py persons create "Juan Perez"
+  python3 setup_cliente.py persons create "Juan" "Perez"
   python3 setup_cliente.py faces embed <person_id> foto.jpg
   python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5
 
@@ -839,6 +844,8 @@ Variables de entorno:
     frames_list.add_argument("--lat-max", type=float, help="Latitud maxima")
     frames_list.add_argument("--lon-min", type=float, help="Longitud minima")
     frames_list.add_argument("--lon-max", type=float, help="Longitud maxima")
+    frames_list.add_argument("--camera-id", help="Filtrar por ID de camara")
+    frames_list.add_argument("--source", help="Filtrar por fuente")
     frames_list.add_argument("--limit", type=int, default=10, help="Maximo resultados (default: 10)")
     frames_list.add_argument("--offset", type=int, default=0, help="Desplazamiento (default: 0)")
 
@@ -858,7 +865,8 @@ Variables de entorno:
     persons_sub.add_parser("list", help="Listar personas registradas")
 
     persons_create = persons_sub.add_parser("create", help="Crear una persona")
-    persons_create.add_argument("name", help="Nombre de la persona")
+    persons_create.add_argument("nombre", help="Nombre de la persona")
+    persons_create.add_argument("apellido", help="Apellido de la persona")
     persons_create.add_argument("--email", help="Email de la persona")
     persons_create.add_argument("--metadata", help="Metadatos adicionales (JSON)")
 

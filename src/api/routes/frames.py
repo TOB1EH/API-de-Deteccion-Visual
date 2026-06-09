@@ -29,6 +29,8 @@ async def search_frames(
     lon_min: Optional[float] = Query(None),
     lon_max: Optional[float] = Query(None),
     clases: Optional[str] = Query(None),
+    camera_id: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -44,6 +46,10 @@ async def search_frames(
             filters["lon_max"] = lon_max
         if class_list:
             filters["classes"] = class_list
+        if camera_id is not None:
+            filters["camera_id"] = camera_id
+        if source is not None:
+            filters["source"] = source
 
         results = db_service.search_frames(filters, limit=limit, offset=offset)
         total = db_service.count_frames(filters)

@@ -287,6 +287,12 @@ class DatabaseService:
                 placeholders = ",".join(["%s"] * len(filters["classes"]))
                 conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
                 params.extend(filters["classes"])
+            if "camera_id" in filters:
+                conditions.append("camera_id = %s")
+                params.append(filters["camera_id"])
+            if "source" in filters:
+                conditions.append("source = %s")
+                params.append(filters["source"])
 
             where = " AND ".join(conditions) if conditions else "TRUE"
             query = f"""
@@ -326,6 +332,12 @@ class DatabaseService:
                 placeholders = ",".join(["%s"] * len(filters["classes"]))
                 conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
                 params.extend(filters["classes"])
+            if "camera_id" in filters:
+                conditions.append("camera_id = %s")
+                params.append(filters["camera_id"])
+            if "source" in filters:
+                conditions.append("source = %s")
+                params.append(filters["source"])
 
             where = " AND ".join(conditions) if conditions else "TRUE"
             query = f"SELECT COUNT(*) FROM frames WHERE {where}"
@@ -391,6 +403,11 @@ class DatabaseService:
             logger.error("Error creando persona: %s", e)
             return False
 
+    @staticmethod
+    def _name_to_parts(name: str) -> dict:
+        parts = name.strip().split(" ", 1)
+        return {"nombre": parts[0], "apellido": parts[1] if len(parts) > 1 else ""}
+
     def get_person(self, person_id: str) -> Optional[dict]:
         try:
             conn = self.get_connection()
@@ -405,7 +422,12 @@ class DatabaseService:
             result = cursor.fetchone()
             cursor.close()
             conn.close()
-            return dict(result) if result else None
+            if not result:
+                return None
+            d = dict(result)
+            name = d.pop("name", "")
+            d.update(self._name_to_parts(name))
+            return d
         except Exception as e:
             logger.error("Error obteniendo persona: %s", e)
             return None
@@ -424,7 +446,13 @@ class DatabaseService:
             results = cursor.fetchall()
             cursor.close()
             conn.close()
-            return [dict(r) for r in results]
+            out = []
+            for r in results:
+                d = dict(r)
+                name = d.pop("name", "")
+                d.update(self._name_to_parts(name))
+                out.append(d)
+            return out
         except Exception as e:
             logger.error("Error listando personas: %s", e)
             return []
