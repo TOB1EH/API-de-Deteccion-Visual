@@ -41,7 +41,7 @@ CONTAINER_NAME = "yolo-inference-local"
 
 # Face recognition (DeepFace local via inference-server)
 FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
-API_URL = os.environ.get("API_URL", "http://api_detection_api_local:8000")
+API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
 
 # ==============================================================================
@@ -246,14 +246,15 @@ def start_container(models_dir):
     ]
     os.makedirs(face_weights_dir, exist_ok=True)
     cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
-    cmd.extend(["--network", DOCKER_NETWORK])
+    if "api_detection_api_local" in API_URL:
+        cmd.extend(["--network", DOCKER_NETWORK])
     cmd.extend(["-e", f"API_URL={API_URL}"])
     cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
     cmd.append(DOCKER_IMAGE)
     try:
         subprocess.run(cmd, check=True, timeout=60)
         print_ok(f"Contenedor '{CONTAINER_NAME}' corriendo en http://localhost:8001")
-        print_ok("Reconocimiento facial habilitado (DeepFace + API local)")
+        print_ok(f"Reconocimiento facial habilitado (DeepFace + API en {API_URL})")
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"Error iniciando contenedor: {e}")
@@ -804,7 +805,7 @@ Variables de entorno:
   API_BASE           Backend al que apuntar (default: https://bfts2026.mooo.com)
   MODELS_DIR         Directorio de modelos (default: ./modelos)
   INFER_URL          URL del servidor de inferencia local
-  API_URL            URL de la API local para persistencia facial (default: http://host.docker.internal:8000)
+  API_URL            URL de la API para persistencia facial (default: https://bfts2026.mooo.com)
         """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")
