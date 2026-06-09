@@ -86,10 +86,10 @@ async def recognize_face(request: FaceRecognizeRequest):
                    p.person_id::TEXT,
                    p.name,
                    fe.confidence,
-                   fe.embedding <-> %s::vector AS distance
+                   fe.embedding <=> %s::vector AS distance
             FROM face_embeddings fe
             JOIN persons p ON p.person_id = fe.person_id
-            WHERE fe.embedding <-> %s::vector < %s
+            WHERE fe.embedding <=> %s::vector < %s
             ORDER BY distance ASC
             LIMIT 5
             """,
