@@ -1,0 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastapi>=0.68.0
+uvicorn>=0.15.0
+ultralytics>=8.0.0
+python-multipart>=0.0.5
+opencv-python-headless
+torch
+deepface>=0.0.80
+psycopg2-binary>=2.9.9
+requests>=2.31.0

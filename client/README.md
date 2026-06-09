@@ -97,7 +97,22 @@ python3 setup_cliente.py persons create "Juan Perez" --email juan@mail.com
 python3 setup_cliente.py persons get <person_id>
 ```
 
-### Reconocimiento facial
+### Reconocimiento facial (S5.2 + S5.3)
+
+Requiere configurar acceso a la BD remota via variables de entorno:
+
+```bash
+export FACE_DATABASE_URL=postgresql://detections_user:bfts2026.@bfts2026.mooo.com:5432/detections_db
+export FACE_SEAWEED_URL=http://bfts2026.mooo.com:8080
+```
+
+Luego reinstalar para que el contenedor de inferencia levante con soporte DeepFace:
+
+```bash
+python3 setup_cliente.py install
+```
+
+**Comandos disponibles:**
 
 ```bash
 # Generar embedding facial para una persona (S5.2)
@@ -107,10 +122,12 @@ python3 setup_cliente.py faces embed <person_id> ~/foto.jpg
 python3 setup_cliente.py faces recognize ~/foto_test.jpg --threshold 0.5
 ```
 
+El procesamiento DeepFace corre en tu PC (contenedor Docker local). Los embeddings y las imagenes se persisten en la BD y SeaweedFS remotos.
+
 **Flujo completo para reconocer un famoso:**
 
 ```bash
-# 1. Crear la persona
+# 1. Crear la persona en BD remota
 python3 setup_cliente.py persons create "Franco Colapinto"
 
 # 2. Copiar el person_id del resultado
@@ -147,6 +164,8 @@ API_BASE=http://localhost python3 setup_cliente.py frames list
 | `API_BASE` | `https://bfts2026.mooo.com` | URL del backend |
 | `MODELS_DIR` | `./modelos` | Directorio de modelos YOLO |
 | `INFER_URL` | `http://localhost:8001/infer` | URL del servidor de inferencia |
+| `FACE_DATABASE_URL` | `""` | URL de BD remota para reconocimiento facial |
+| `FACE_SEAWEED_URL` | `""` | URL de SeaweedFS remoto para imagenes faciales |
 
 ## Referencia rapida de subcomandos
 
@@ -162,6 +181,8 @@ API_BASE=http://localhost python3 setup_cliente.py frames list
 | `persons` | `list` | Lista personas registradas |
 | `persons` | `create <nombre>` | Crea una nueva persona |
 | `persons` | `get <id>` | Obtiene detalle de una persona |
+| `faces` | `embed <id> <imagen>` | Genera embedding facial (S5.2) |
+| `faces` | `recognize <imagen>` | Reconoce rostro en imagen (S5.3) |
 
 ## Solucion de problemas
 
@@ -176,3 +197,9 @@ Verifica que `API_BASE` este correcto. Para pruebas locales debe ser `http://loc
 
 **Error: Debes especificar ambos: --lat-min Y --lat-max (o ninguno)**
 Los filtros geograficos requieren el par completo de minimo y maximo. Corrige el comando agregando ambos valores.
+
+**Error: Face recognition no habilitado (falta DATABASE_URL)**
+Ejecuta `export FACE_DATABASE_URL=postgresql://...` y luego `python3 setup_cliente.py install` para reiniciar el contenedor con soporte facial.
+
+**Error: DeepFace tarda mucho o falla**
+Es normal en el primer uso (descarga pesos del modelo ~500MB). Los pesos se cachean en `./face_weights/` para proximas ejecuciones.

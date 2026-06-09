@@ -39,9 +39,16 @@ MODELS_DIR = os.environ.get("MODELS_DIR", os.path.join(os.path.dirname(os.path.a
 DOCKER_IMAGE = "tfunes/inference-server:latest"
 CONTAINER_NAME = "yolo-inference-local"
 
-# Face recognition (SeaweedFS upload local)
-SEAWEED_SUBMIT_URL = os.environ.get("SEAWEED_SUBMIT_URL", "http://localhost:9333/submit")
-SEAWEED_PUBLIC_URL = os.environ.get("SEAWEED_PUBLIC_URL", "http://localhost/seaweed")
+# Face recognition (DeepFace local via inference-server)
+FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
+FACE_DATABASE_URL = os.environ.get(
+    "FACE_DATABASE_URL",
+    "postgresql://detections_user:bfts2026.@bfts2026.mooo.com:5432/detections_db"
+)
+FACE_SEAWEED_URL = os.environ.get(
+    "FACE_SEAWEED_URL",
+    "http://bfts2026.mooo.com:8080"
+)
 
 # ==============================================================================
 # COLORES
@@ -96,29 +103,6 @@ def api_post(path, data):
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode())
-
-
-def seaweed_upload(filepath: str) -> str:
-    boundary = "----FormBoundary7MA4YWxkTrZu0gW"
-    with open(filepath, "rb") as f:
-        img_data = f.read()
-    filename = os.path.basename(filepath)
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: image/jpeg\r\n\r\n"
-    ).encode() + img_data + (
-        f"\r\n--{boundary}--\r\n"
-    ).encode()
-    req = urllib.request.Request(
-        SEAWEED_SUBMIT_URL,
-        data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode())
-    fid = result["fid"]
-    return f"{SEAWEED_PUBLIC_URL}/{fid}.jpg"
 
 
 # ==============================================================================
@@ -259,18 +243,26 @@ def start_container(models_dir):
     print_step("Iniciando contenedor de inferencia...")
     subprocess.run(["docker", "rm", "-f", CONTAINER_NAME], capture_output=True, timeout=10)
     abs_models_dir = os.path.abspath(models_dir)
+    face_weights_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "face_weights")
+    cmd = [
+        "docker", "run", "-d",
+        "--name", CONTAINER_NAME,
+        "-p", "8001:8000",
+        "-v", f"{abs_models_dir}:/app/models",
+    ]
+    if FACE_DATABASE_URL:
+        os.makedirs(face_weights_dir, exist_ok=True)
+        cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
+        cmd.extend(["-e", f"DATABASE_URL={FACE_DATABASE_URL}"])
+        if FACE_SEAWEED_URL:
+            cmd.extend(["-e", f"SEAWEED_URL={FACE_SEAWEED_URL}"])
+        cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
+    cmd.append(DOCKER_IMAGE)
     try:
-        subprocess.run(
-            [
-                "docker", "run", "-d",
-                "--name", CONTAINER_NAME,
-                "-p", "8001:8000",
-                "-v", f"{abs_models_dir}:/app/models",
-                DOCKER_IMAGE,
-            ],
-            check=True, timeout=60
-        )
+        subprocess.run(cmd, check=True, timeout=60)
         print_ok(f"Contenedor '{CONTAINER_NAME}' corriendo en http://localhost:8001")
+        if FACE_DATABASE_URL:
+            print_ok("Reconocimiento facial habilitado (DeepFace + BD remota)")
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"Error iniciando contenedor: {e}")
@@ -331,6 +323,11 @@ def cmd_install():
     print()
     print(f"  Para procesar una imagen, ejecuta:")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py infer ruta/imagen.jpg --model {downloaded_model or 'yolo11n.pt'}{Colors.ENDC}")
+    if FACE_DATABASE_URL:
+        print()
+        print(f"  Reconocimiento facial habilitado:")
+        print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> foto.jpg{Colors.ENDC}")
+        print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5{Colors.ENDC}")
     print()
 
 
@@ -660,25 +657,32 @@ def cmd_faces_embed(args):
         print_error(f"Imagen no encontrada: {image_path}")
         sys.exit(1)
 
-    print_step(f"Subiendo imagen a SeaweedFS...")
-    try:
-        image_url = seaweed_upload(image_path)
-    except Exception as e:
-        print_error(f"Error subiendo a SeaweedFS: {e}")
-        sys.exit(1)
-    print_ok(f"URL: {image_url}")
+    with open(image_path, "rb") as f:
+        img_data = f.read()
 
-    print_step(f"Generando embedding para persona {person_id}...")
-    payload = {"image_url": image_url}
-    if args.confidence:
-        payload["confidence"] = args.confidence
+    print_step(f"Enviando imagen a inference-server para generar embedding...")
+    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="image"; filename="image.jpg"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode() + img_data + (
+        f"\r\n--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="person_id"\r\n\r\n'
+        f"{person_id}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    req = urllib.request.Request(
+        f"{FACE_INFER_URL}/face/embed", data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    )
     try:
-        result = api_post(f"persons/{person_id}/embeddings", payload)
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        if e.code == 404:
-            print_error(f"Persona {person_id} no encontrada")
-        else:
-            print_error(f"Error {e.code}: {e.read().decode()}")
+        error_body = e.read().decode()
+        print_error(f"Error {e.code}: {error_body}")
         sys.exit(1)
     except Exception as e:
         print_error(f"Error de conexion: {e}")
@@ -686,9 +690,10 @@ def cmd_faces_embed(args):
 
     print_ok(f"Embedding generado:")
     print(f"  Embedding ID: {result['embedding_id']}")
-    print(f"  Confianza: {result['confidence']:.4f}")
+    print(f"  Persona ID: {result.get('person_id', person_id)}")
+    print(f"  Confianza: {result.get('confidence', 'N/A')}")
+    print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
     print(f"  Estado: {result['status']}")
-    print(f"  Mensaje: {result['message']}")
 
 
 def cmd_faces_recognize(args):
@@ -698,19 +703,34 @@ def cmd_faces_recognize(args):
         print_error(f"Imagen no encontrada: {image_path}")
         sys.exit(1)
 
-    print_step(f"Subiendo imagen a SeaweedFS...")
-    try:
-        image_url = seaweed_upload(image_path)
-    except Exception as e:
-        print_error(f"Error subiendo a SeaweedFS: {e}")
-        sys.exit(1)
-    print_ok(f"URL: {image_url}")
+    with open(image_path, "rb") as f:
+        img_data = f.read()
 
     threshold = args.threshold
-    print_step(f"Reconociendo rostro (threshold={threshold})...")
-    payload = {"image_url": image_url, "threshold": threshold}
+    print_step(f"Enviando imagen a inference-server para reconocimiento (threshold={threshold})...")
+    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="image"; filename="image.jpg"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode() + img_data + (
+        f"\r\n--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="threshold"\r\n\r\n'
+        f"{threshold}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    req = urllib.request.Request(
+        f"{FACE_INFER_URL}/face/recognize", data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    )
     try:
-        result = api_post("face-recognition", payload)
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print_error(f"Error {e.code}: {error_body}")
+        sys.exit(1)
     except Exception as e:
         print_error(f"Error de conexion: {e}")
         sys.exit(1)
@@ -787,11 +807,15 @@ Ejemplos:
   python3 setup_cliente.py frames annotate <frame_id>
   python3 setup_cliente.py persons list
   python3 setup_cliente.py persons create "Juan Perez"
+  python3 setup_cliente.py faces embed <person_id> foto.jpg
+  python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5
 
 Variables de entorno:
-  API_BASE      Backend al que apuntar (default: https://bfts2026.mooo.com)
-  MODELS_DIR    Directorio de modelos (default: ./modelos)
-  INFER_URL     URL del servidor de inferencia local
+  API_BASE           Backend al que apuntar (default: https://bfts2026.mooo.com)
+  MODELS_DIR         Directorio de modelos (default: ./modelos)
+  INFER_URL          URL del servidor de inferencia local
+  FACE_DATABASE_URL  URL de BD remota para reconocimiento facial
+  FACE_SEAWEED_URL   URL de SeaweedFS remoto para imagenes faciales
         """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")
