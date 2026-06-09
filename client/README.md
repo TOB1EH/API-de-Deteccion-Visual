@@ -97,6 +97,31 @@ python3 setup_cliente.py persons create "Juan Perez" --email juan@mail.com
 python3 setup_cliente.py persons get <person_id>
 ```
 
+### Reconocimiento facial
+
+```bash
+# Generar embedding facial para una persona (S5.2)
+python3 setup_cliente.py faces embed <person_id> ~/foto.jpg
+
+# Reconocer rostro en una imagen (S5.3)
+python3 setup_cliente.py faces recognize ~/foto_test.jpg --threshold 0.5
+```
+
+**Flujo completo para reconocer un famoso:**
+
+```bash
+# 1. Crear la persona
+python3 setup_cliente.py persons create "Franco Colapinto"
+
+# 2. Copiar el person_id del resultado
+# 3. Subir una foto de referencia y generar el embedding
+python3 setup_cliente.py faces embed <person_id> ~/famosos/colapinto.jpg
+
+# 4. Reconocer una foto diferente
+python3 setup_cliente.py faces recognize ~/famosos/colapinto_otra.jpg --threshold 0.5
+# -> RECONOCIDO: Franco Colapinto (confianza: 0.85)
+```
+
 ## Backend local vs remoto
 
 Por defecto apunta al servidor remoto (`https://bfts2026.mooo.com`).

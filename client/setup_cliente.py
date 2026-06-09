@@ -39,6 +39,10 @@ MODELS_DIR = os.environ.get("MODELS_DIR", os.path.join(os.path.dirname(os.path.a
 DOCKER_IMAGE = "tfunes/inference-server:latest"
 CONTAINER_NAME = "yolo-inference-local"
 
+# Face recognition (SeaweedFS upload local)
+SEAWEED_SUBMIT_URL = os.environ.get("SEAWEED_SUBMIT_URL", "http://localhost:9333/submit")
+SEAWEED_PUBLIC_URL = os.environ.get("SEAWEED_PUBLIC_URL", "http://localhost/seaweed")
+
 # ==============================================================================
 # COLORES
 # ==============================================================================
@@ -92,6 +96,29 @@ def api_post(path, data):
     )
     with urllib.request.urlopen(req, timeout=60) as resp:
         return json.loads(resp.read().decode())
+
+
+def seaweed_upload(filepath: str) -> str:
+    boundary = "----FormBoundary7MA4YWxkTrZu0gW"
+    with open(filepath, "rb") as f:
+        img_data = f.read()
+    filename = os.path.basename(filepath)
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode() + img_data + (
+        f"\r\n--{boundary}--\r\n"
+    ).encode()
+    req = urllib.request.Request(
+        SEAWEED_SUBMIT_URL,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        result = json.loads(resp.read().decode())
+    fid = result["fid"]
+    return f"{SEAWEED_PUBLIC_URL}/{fid}.jpg"
 
 
 # ==============================================================================
@@ -623,6 +650,126 @@ def cmd_persons_get(args):
 
 
 # ==============================================================================
+# COMANDO: faces
+# ==============================================================================
+def cmd_faces_embed(args):
+    person_id = args.person_id
+    image_path = args.image
+
+    if not os.path.exists(image_path):
+        print_error(f"Imagen no encontrada: {image_path}")
+        sys.exit(1)
+
+    print_step(f"Subiendo imagen a SeaweedFS...")
+    try:
+        image_url = seaweed_upload(image_path)
+    except Exception as e:
+        print_error(f"Error subiendo a SeaweedFS: {e}")
+        sys.exit(1)
+    print_ok(f"URL: {image_url}")
+
+    print_step(f"Generando embedding para persona {person_id}...")
+    payload = {"image_url": image_url}
+    if args.confidence:
+        payload["confidence"] = args.confidence
+    try:
+        result = api_post(f"persons/{person_id}/embeddings", payload)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print_error(f"Persona {person_id} no encontrada")
+        else:
+            print_error(f"Error {e.code}: {e.read().decode()}")
+        sys.exit(1)
+    except Exception as e:
+        print_error(f"Error de conexion: {e}")
+        sys.exit(1)
+
+    print_ok(f"Embedding generado:")
+    print(f"  Embedding ID: {result['embedding_id']}")
+    print(f"  Confianza: {result['confidence']:.4f}")
+    print(f"  Estado: {result['status']}")
+    print(f"  Mensaje: {result['message']}")
+
+
+def cmd_faces_recognize(args):
+    image_path = args.image
+
+    if not os.path.exists(image_path):
+        print_error(f"Imagen no encontrada: {image_path}")
+        sys.exit(1)
+
+    print_step(f"Subiendo imagen a SeaweedFS...")
+    try:
+        image_url = seaweed_upload(image_path)
+    except Exception as e:
+        print_error(f"Error subiendo a SeaweedFS: {e}")
+        sys.exit(1)
+    print_ok(f"URL: {image_url}")
+
+    threshold = args.threshold
+    print_step(f"Reconociendo rostro (threshold={threshold})...")
+    payload = {"image_url": image_url, "threshold": threshold}
+    try:
+        result = api_post("face-recognition", payload)
+    except Exception as e:
+        print_error(f"Error de conexion: {e}")
+        sys.exit(1)
+
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        print_error("Pillow no esta instalado. Ejecuta: pip install Pillow")
+        sys.exit(1)
+
+    img = Image.open(image_path).convert("RGB")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    output_dir = os.path.dirname(os.path.abspath(image_path))
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+    annotated_path = os.path.join(output_dir, f"{base_name}_anotada.jpg")
+
+    facial_area = result.get("facial_area", {})
+
+    if facial_area and "x" in facial_area:
+        x = facial_area["x"]
+        y = facial_area["y"]
+        w = facial_area["w"]
+        h = facial_area["h"]
+
+        if result.get("recognized"):
+            match = result["matches"][0]
+            name = match["name"]
+            confianza = match["confidence"]
+            label = f"{name} ({confianza:.2f})"
+
+            draw.rectangle([x, y, x + w, y + h], outline="#00FF00", width=4)
+            tw = draw.textlength(label, font=font)
+            draw.rectangle([x - 2, y - 14, x + tw + 2, y], fill="#00FF00")
+            draw.text((x, y - 14), label, fill="#000000", font=font)
+        else:
+            label = "Unknown"
+
+            draw.rectangle([x, y, x + w, y + h], outline="#FF0000", width=4)
+            tw = draw.textlength(label, font=font)
+            draw.rectangle([x - 2, y - 14, x + tw + 2, y], fill="#FF0000")
+            draw.text((x, y - 14), label, fill="#FFFFFF", font=font)
+
+    img.save(annotated_path, "JPEG", quality=95)
+    print_ok(f"Imagen anotada guardada: {annotated_path}")
+
+    if result.get("recognized"):
+        print()
+        for match in result["matches"]:
+            print(f"  {Colors.OKGREEN}RECONOCIDO:{Colors.ENDC} {match['name']}")
+            print(f"  Persona ID: {match['person_id']}")
+            print(f"  Confianza: {match['confidence']:.4f}")
+            print(f"  Distancia coseno: {match['distance']:.4f}")
+            print()
+    else:
+        print(f"\n  {Colors.WARNING}No reconocido{Colors.ENDC} (ninguna coincidencia supera threshold={threshold})")
+
+
+# ==============================================================================
 # MAIN
 # ==============================================================================
 def main():
@@ -704,6 +851,19 @@ Variables de entorno:
     persons_get = persons_sub.add_parser("get", help="Obtener una persona por ID")
     persons_get.add_argument("person_id", help="ID de la persona")
 
+    # faces
+    faces_parser = subparsers.add_parser("faces", help="Reconocimiento facial (S5.2 y S5.3)")
+    faces_sub = faces_parser.add_subparsers(dest="faces_subcommand", help="Subcomando")
+
+    faces_embed = faces_sub.add_parser("embed", help="Generar embedding facial para una persona")
+    faces_embed.add_argument("person_id", help="ID de la persona")
+    faces_embed.add_argument("image", help="Ruta a la imagen con el rostro")
+    faces_embed.add_argument("--confidence", type=float, help="Confianza manual (0-1)")
+
+    faces_recognize = faces_sub.add_parser("recognize", help="Reconocer rostro en una imagen")
+    faces_recognize.add_argument("image", help="Ruta a la imagen con el rostro a reconocer")
+    faces_recognize.add_argument("--threshold", type=float, default=0.5, help="Umbral de confianza (default: 0.5)")
+
     args = parser.parse_args()
 
     if args.command == "install":
@@ -735,6 +895,13 @@ Variables de entorno:
             cmd_persons_get(args)
         else:
             persons_parser.print_help()
+    elif args.command == "faces":
+        if args.faces_subcommand == "embed":
+            cmd_faces_embed(args)
+        elif args.faces_subcommand == "recognize":
+            cmd_faces_recognize(args)
+        else:
+            faces_parser.print_help()
     else:
         parser.print_help()
 

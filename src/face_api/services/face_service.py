@@ -44,9 +44,11 @@ class FaceService:
                 if isinstance(item, dict):
                     embedding = item.get("embedding", [])
                     raw_confidence = item.get("face_confidence", 1.0)
+                    facial_area = item.get("facial_area", {})
                 elif isinstance(item, list):
                     embedding = item
                     raw_confidence = 1.0
+                    facial_area = {}
                 else:
                     return {"error": "Formato de resultado inesperado"}
 
@@ -56,7 +58,7 @@ class FaceService:
                     return {"error": "Embedding vacío o inválido"}
 
                 confidence = min(float(raw_confidence), 1.0)
-                return {"embedding": embedding, "confidence": confidence, "faces_detected": len(result)}
+                return {"embedding": embedding, "confidence": confidence, "faces_detected": len(result), "facial_area": facial_area}
             elif isinstance(result, dict):
                 embedding = result.get("embedding", [])
                 if isinstance(embedding, np.ndarray):

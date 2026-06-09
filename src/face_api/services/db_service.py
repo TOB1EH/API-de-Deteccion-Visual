@@ -78,18 +78,18 @@ class FaceDatabaseService:
                        p.person_id::TEXT,
                        p.name,
                        fe.confidence,
-                       fe.embedding <-> %s::vector AS distance
+                       fe.embedding <=> %s::vector AS distance
                 FROM face_embeddings fe
                 JOIN persons p ON p.person_id = fe.person_id
-                WHERE fe.embedding <-> %s::vector < %s
                 ORDER BY distance ASC
                 LIMIT %s
                 """,
-                (embedding, embedding, 2.0 - threshold, limit)
+                (embedding, limit)
             )
             results = cursor.fetchall()
             cursor.close()
             conn.close()
+            logger.info("Busqueda facial: %d resultados (threshold=%.2f)", len(results), threshold)
             return [dict(r) for r in results]
         except Exception as e:
             logger.error("Error en búsqueda facial: %s", e)

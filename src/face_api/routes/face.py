@@ -106,20 +106,13 @@ async def recognize_face(request: RecognitionRequest):
             )
 
         query_embedding = result["embedding"]
+        query_facial_area = result.get("facial_area", {})
 
         similar = face_db.search_similar(
             embedding=query_embedding,
             threshold=request.threshold,
             limit=5
         )
-
-        if not similar:
-            return RecognitionResponse(
-                recognized=False,
-                matches=[],
-                threshold=request.threshold,
-                image_url=request.image_url
-            )
 
         matches = []
         for match in similar:
@@ -137,7 +130,8 @@ async def recognize_face(request: RecognitionRequest):
             recognized=len(matches) > 0,
             matches=matches,
             threshold=request.threshold,
-            image_url=request.image_url
+            image_url=request.image_url,
+            facial_area=query_facial_area
         )
 
     except HTTPException:
