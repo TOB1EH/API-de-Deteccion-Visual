@@ -8,6 +8,10 @@ from io import BytesIO
 from fastapi import APIRouter, HTTPException
 from psycopg2.extras import RealDictCursor
 
+
+def _embedding_to_str(embedding: list[float]) -> str:
+    return "[" + ",".join(str(v) for v in embedding) + "]"
+
 from ..schemas.face import (
     FaceEmbedRequest, FaceEmbedResponse,
     FaceRecognizeRequest, FaceRecognizeResponse, FaceMatchResult,
@@ -51,7 +55,7 @@ async def create_face_embedding(request: FaceEmbedRequest):
             INSERT INTO face_embeddings (embedding_id, person_id, embedding, confidence, image_url)
             VALUES (%s, %s, %s::vector, %s, %s)
             """,
-            (embedding_id, request.person_id, request.embedding, request.confidence, image_url or ""),
+            (embedding_id, request.person_id, _embedding_to_str(request.embedding), request.confidence, image_url or ""),
         )
         conn.commit()
         cursor.close()
@@ -93,7 +97,7 @@ async def recognize_face(request: FaceRecognizeRequest):
             ORDER BY distance ASC
             LIMIT 5
             """,
-            (request.embedding, request.embedding, 2.0 - request.threshold),
+            (_embedding_to_str(request.embedding), _embedding_to_str(request.embedding), 2.0 - request.threshold),
         )
         rows = cursor.fetchall()
         cursor.close()
