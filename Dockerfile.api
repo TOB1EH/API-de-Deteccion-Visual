@@ -21,6 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código fuente de la aplicación
 COPY src/ ./src/
 
+# Copiar script de instalación del nodo local
+COPY client/setup_cliente.py ./client/setup_cliente.py
+
 # Copiar carpeta de modelos (solo lectura)
 COPY models/ ./models/
 

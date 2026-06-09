@@ -57,6 +57,8 @@ Filtros:
 - `--clases`: filtrar por clase separada por comas (person,car,cat)
 - `--lat-min` / `--lat-max`: rango de latitud (ambos obligatorios si se usa uno)
 - `--lon-min` / `--lon-max`: rango de longitud (ambos obligatorios si se usa uno)
+- `--camera-id`: filtrar por ID de camara
+- `--source`: filtrar por fuente (ej: setup-cliente)
 - `--limit`: maximo resultados (default: 10, max: 200)
 - `--offset`: desplazamiento para paginacion
 
@@ -91,7 +93,7 @@ Descarga la imagen original y dibuja los bounding boxes con las clases detectada
 python3 setup_cliente.py persons list
 
 # Crear una
-python3 setup_cliente.py persons create "Juan Perez" --email juan@mail.com
+python3 setup_cliente.py persons create "Juan" "Perez" --email juan@mail.com
 
 # Obtener por ID
 python3 setup_cliente.py persons get <person_id>
@@ -99,18 +101,7 @@ python3 setup_cliente.py persons get <person_id>
 
 ### Reconocimiento facial (S5.2 + S5.3)
 
-Requiere configurar acceso a la BD remota via variables de entorno:
-
-```bash
-export FACE_DATABASE_URL=postgresql://detections_user:bfts2026.@bfts2026.mooo.com:5432/detections_db
-export FACE_SEAWEED_URL=http://bfts2026.mooo.com:8080
-```
-
-Luego reinstalar para que el contenedor de inferencia levante con soporte DeepFace:
-
-```bash
-python3 setup_cliente.py install
-```
+El contenedor de inferencia local incluye DeepFace. Los embeddings se generan localmente y se persisten via la API (remota o local).
 
 **Comandos disponibles:**
 
@@ -128,15 +119,7 @@ El procesamiento DeepFace corre en tu PC (contenedor Docker local). Los embeddin
 
 ```bash
 # 1. Crear la persona en BD remota
-python3 setup_cliente.py persons create "Franco Colapinto"
-
-# 2. Copiar el person_id del resultado
-# 3. Subir una foto de referencia y generar el embedding
-python3 setup_cliente.py faces embed <person_id> ~/famosos/colapinto.jpg
-
-# 4. Reconocer una foto diferente
-python3 setup_cliente.py faces recognize ~/famosos/colapinto_otra.jpg --threshold 0.5
-# -> RECONOCIDO: Franco Colapinto (confianza: 0.85)
+python3 setup_cliente.py persons create "Franco" "Colapinto"
 ```
 
 ## Backend local vs remoto
@@ -161,11 +144,11 @@ API_BASE=http://localhost python3 setup_cliente.py frames list
 
 | Variable | Default | Descripcion |
 |---|---|---|
-| `API_BASE` | `https://bfts2026.mooo.com` | URL del backend |
+| `API_BASE` | `https://bfts2026.mooo.com` | URL del backend (API + persistencia) |
+| `API_URL` | `https://bfts2026.mooo.com` | URL para persistencia facial (inference-server) |
+| `FACE_INFER_URL` | `http://localhost:8001` | URL del servidor de inferencia local |
+| `INFER_URL` | `http://localhost:8001/infer` | URL del endpoint de inferencia YOLO |
 | `MODELS_DIR` | `./modelos` | Directorio de modelos YOLO |
-| `INFER_URL` | `http://localhost:8001/infer` | URL del servidor de inferencia |
-| `FACE_DATABASE_URL` | `""` | URL de BD remota para reconocimiento facial |
-| `FACE_SEAWEED_URL` | `""` | URL de SeaweedFS remoto para imagenes faciales |
 
 ## Referencia rapida de subcomandos
 
@@ -179,7 +162,7 @@ API_BASE=http://localhost python3 setup_cliente.py frames list
 | `frames` | `get <id>` | Descarga imagen de un fotograma (S3) |
 | `frames` | `annotate <id>` | Descarga imagen con bounding boxes dibujados |
 | `persons` | `list` | Lista personas registradas |
-| `persons` | `create <nombre>` | Crea una nueva persona |
+| `persons` | `create <nombre> <apellido>` | Crea una nueva persona |
 | `persons` | `get <id>` | Obtiene detalle de una persona |
 | `faces` | `embed <id> <imagen>` | Genera embedding facial (S5.2) |
 | `faces` | `recognize <imagen>` | Reconoce rostro en imagen (S5.3) |
@@ -198,8 +181,8 @@ Verifica que `API_BASE` este correcto. Para pruebas locales debe ser `http://loc
 **Error: Debes especificar ambos: --lat-min Y --lat-max (o ninguno)**
 Los filtros geograficos requieren el par completo de minimo y maximo. Corrige el comando agregando ambos valores.
 
-**Error: Face recognition no habilitado (falta DATABASE_URL)**
-Ejecuta `export FACE_DATABASE_URL=postgresql://...` y luego `python3 setup_cliente.py install` para reiniciar el contenedor con soporte facial.
+**Error: Face recognition no disponible**
+Verifica que el contenedor de inferencia este corriendo con `docker ps`. Si no, ejecuta `python3 setup_cliente.py install`.
 
 **Error: DeepFace tarda mucho o falla**
 Es normal en el primer uso (descarga pesos del modelo ~500MB). Los pesos se cachean en `./face_weights/` para proximas ejecuciones.
