@@ -41,14 +41,8 @@ CONTAINER_NAME = "yolo-inference-local"
 
 # Face recognition (DeepFace local via inference-server)
 FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
-FACE_DATABASE_URL = os.environ.get(
-    "FACE_DATABASE_URL",
-    "postgresql://detections_user:bfts2026.@bfts2026.mooo.com:5432/detections_db"
-)
-FACE_SEAWEED_URL = os.environ.get(
-    "FACE_SEAWEED_URL",
-    "http://bfts2026.mooo.com:8080"
-)
+API_URL = os.environ.get("API_URL", "http://api_detection_api_local:8000")
+DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
 
 # ==============================================================================
 # COLORES
@@ -250,19 +244,16 @@ def start_container(models_dir):
         "-p", "8001:8000",
         "-v", f"{abs_models_dir}:/app/models",
     ]
-    if FACE_DATABASE_URL:
-        os.makedirs(face_weights_dir, exist_ok=True)
-        cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
-        cmd.extend(["-e", f"DATABASE_URL={FACE_DATABASE_URL}"])
-        if FACE_SEAWEED_URL:
-            cmd.extend(["-e", f"SEAWEED_URL={FACE_SEAWEED_URL}"])
-        cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
+    os.makedirs(face_weights_dir, exist_ok=True)
+    cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
+    cmd.extend(["--network", DOCKER_NETWORK])
+    cmd.extend(["-e", f"API_URL={API_URL}"])
+    cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
     cmd.append(DOCKER_IMAGE)
     try:
         subprocess.run(cmd, check=True, timeout=60)
         print_ok(f"Contenedor '{CONTAINER_NAME}' corriendo en http://localhost:8001")
-        if FACE_DATABASE_URL:
-            print_ok("Reconocimiento facial habilitado (DeepFace + BD remota)")
+        print_ok("Reconocimiento facial habilitado (DeepFace + API local)")
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"Error iniciando contenedor: {e}")
@@ -323,11 +314,10 @@ def cmd_install():
     print()
     print(f"  Para procesar una imagen, ejecuta:")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py infer ruta/imagen.jpg --model {downloaded_model or 'yolo11n.pt'}{Colors.ENDC}")
-    if FACE_DATABASE_URL:
-        print()
-        print(f"  Reconocimiento facial habilitado:")
-        print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> foto.jpg{Colors.ENDC}")
-        print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5{Colors.ENDC}")
+    print()
+    print(f"  Reconocimiento facial habilitado:")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> foto.jpg{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5{Colors.ENDC}")
     print()
 
 
@@ -814,8 +804,7 @@ Variables de entorno:
   API_BASE           Backend al que apuntar (default: https://bfts2026.mooo.com)
   MODELS_DIR         Directorio de modelos (default: ./modelos)
   INFER_URL          URL del servidor de inferencia local
-  FACE_DATABASE_URL  URL de BD remota para reconocimiento facial
-  FACE_SEAWEED_URL   URL de SeaweedFS remoto para imagenes faciales
+  API_URL            URL de la API local para persistencia facial (default: http://host.docker.internal:8000)
         """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")

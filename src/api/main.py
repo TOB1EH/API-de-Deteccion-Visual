@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import models, detections, frames, persons
+from .routes import models, detections, frames, persons, face_proxy
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -50,6 +50,7 @@ app.include_router(models.router, prefix="/api")       # GET /api/models
 app.include_router(detections.router, prefix="/api")   # POST /api/detections
 app.include_router(frames.router, prefix="/api")       # GET /api/frames, /api/frames/search
 app.include_router(persons.router, prefix="/api")      # POST/GET /api/persons
+app.include_router(face_proxy.router, prefix="/api")  # POST /api/faces/embeddings, /api/faces/recognize
 
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")
