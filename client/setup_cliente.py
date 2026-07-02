@@ -7,6 +7,7 @@ Subcomandos:
   install    Descarga modelos y levanta contenedor de inferencia local
   models     Lista modelos disponibles en el backend
   infer      Infiere imagen localmente y sube resultados al backend
+  process    Envia imagen a la API para que ella haga la inferencia (orquestador)
   frames     Consulta y descarga fotogramas (list, get, annotate)
   persons    Gestiona personas registradas (list, create, get)
 
@@ -387,8 +388,22 @@ def cmd_infer(args):
         INFER_URL, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        infer_result = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            infer_result = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print_error(f"Modelo '{model_name}' no encontrado en el contenedor local.")
+            print_error("Asegurate de haberlo descargado con: python3 setup_cliente.py install")
+            print_error("Tambien podes probar con el comando 'process' que usa la API en la nube.")
+            sys.exit(1)
+        else:
+            print_error(f"Error {e.code} del inference-server: {e.reason}")
+            sys.exit(1)
+    except urllib.error.URLError as e:
+        print_error(f"No se puede conectar al inference-server en {INFER_URL}.")
+        print_error("Asegurate de haber ejecutado: python3 setup_cliente.py install")
+        sys.exit(1)
 
     if infer_result["info"]["error"]:
         print_error(f"Error en inferencia: {infer_result['info']['errormsg']}")
@@ -441,6 +456,75 @@ def cmd_infer(args):
             f.write(resp.read())
     print_ok(f"Imagen anotada guardada: {annotated_path}")
     print()
+    print(f"  Para consultar este frame despues:")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames get {frame_id}{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames annotate {frame_id}{Colors.ENDC}")
+    print()
+
+
+# ==============================================================================
+# COMANDO: process
+# ==============================================================================
+def cmd_process(args):
+    """
+    Envia una imagen directamente a la API para que ella misma ejecute la
+    inferencia (via inference-server interno) y persista los resultados.
+
+    A diferencia de 'infer', este comando NO requiere tener el inference-server
+    corriendo localmente. La API en la nube orquesta todo el proceso.
+
+    Requiere que el servidor tenga configurada INFERENCE_SERVER_URL y que
+    el contenedor inference-server este corriendo en la misma red Docker.
+    """
+    image_path = args.image
+    if not os.path.exists(image_path):
+        print_error(f"Imagen no encontrada: {image_path}")
+        sys.exit(1)
+
+    with open(image_path, "rb") as f:
+        img_data = f.read()
+
+    model_name = args.model
+    confidence = args.confidence
+    lat = args.lat
+    lon = args.lon
+    camera_id = args.camera_id
+
+    print_step(f"Enviando imagen a {API_BASE}/api/detections para inferencia remota...")
+    print_step(f"Modelo: {model_name} | Confianza: {confidence} | Coordenadas: {lat}, {lon}")
+
+    image_b64 = base64.b64encode(img_data).decode("utf-8")
+    payload = {
+        "image_base64": f"data:image/jpeg;base64,{image_b64}",
+        "model_id": model_name,
+        "latitude": lat,
+        "longitude": lon,
+        "confidence": confidence,
+        "metadata": {
+            "camera_id": camera_id,
+            "source": "setup-cliente-process",
+        },
+    }
+
+    try:
+        result = api_post("detections", payload)
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print_error(f"Error {e.code}: {error_body}")
+        sys.exit(1)
+    except Exception as e:
+        print_error(f"Error de conexion con {API_BASE}: {e}")
+        sys.exit(1)
+
+    frame_id = result["frame_id"]
+    print_ok(f"Procesado exitosamente!")
+    print(f"  Frame ID:      {frame_id}")
+    print(f"  Detecciones:   {result['detections_count']}")
+    print(f"  Estado:        {result['status']}")
+    print(f"  Mensaje:       {result['message']}")
+    print(f"  Imagen URL:    {result['image_url']}")
+    print()
+
     print(f"  Para consultar este frame despues:")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames get {frame_id}{Colors.ENDC}")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames annotate {frame_id}{Colors.ENDC}")
@@ -798,6 +882,7 @@ Ejemplos:
   python3 setup_cliente.py models list
   python3 setup_cliente.py models info yolo11n.pt
   python3 setup_cliente.py infer foto.jpg --model yolo11n.pt
+  python3 setup_cliente.py process foto.jpg --model yolo11n.pt
   python3 setup_cliente.py frames list --clases person
   python3 setup_cliente.py frames get <frame_id>
   python3 setup_cliente.py frames annotate <frame_id>
@@ -833,6 +918,15 @@ Variables de entorno:
     infer_parser.add_argument("--lat", type=float, default=-34.6037, help="Latitud (default: -34.6037)")
     infer_parser.add_argument("--lon", type=float, default=-58.3816, help="Longitud (default: -58.3816)")
     infer_parser.add_argument("--camera-id", default="local-cam", help="ID de camara (default: local-cam)")
+
+    # process
+    process_parser = subparsers.add_parser("process", help="Envia imagen a la API para inferencia remota (orquestador)")
+    process_parser.add_argument("image", help="Ruta a la imagen a procesar")
+    process_parser.add_argument("--model", default="yolo11n.pt", help="Modelo YOLO a usar (default: yolo11n.pt)")
+    process_parser.add_argument("--confidence", type=float, default=0.25, help="Umbral de confianza (default: 0.25)")
+    process_parser.add_argument("--lat", type=float, default=-34.6037, help="Latitud (default: -34.6037)")
+    process_parser.add_argument("--lon", type=float, default=-58.3816, help="Longitud (default: -58.3816)")
+    process_parser.add_argument("--camera-id", default="local-cam", help="ID de camara (default: local-cam)")
 
     # frames
     frames_parser = subparsers.add_parser("frames", help="Operaciones con fotogramas")
@@ -899,6 +993,8 @@ Variables de entorno:
             models_parser.print_help()
     elif args.command == "infer":
         cmd_infer(args)
+    elif args.command == "process":
+        cmd_process(args)
     elif args.command == "frames":
         if args.frames_subcommand == "list":
             cmd_frames_list(args)

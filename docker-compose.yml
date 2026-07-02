@@ -91,6 +91,23 @@ services:
       - db
     restart: unless-stopped
 
+  # Inference Server (YOLO + DeepFace) - orquestado por la API
+  inference-server:
+    image: tfunes/inference-server:latest
+    container_name: yolo_inference_server
+    environment:
+      # URL de la API para que el inference-server pueda persistir datos faciales
+      API_URL: http://api:8000
+      DEEPFACE_BACKEND: Facenet
+    volumes:
+      # Modelos YOLO montados en la ruta que espera inference-server
+      - ./models/local:/app/models:ro
+      # Pesos de DeepFace para reconocimiento facial
+      - face_weights:/root/.deepface/weights
+    networks:
+      - api-detection-net
+    restart: unless-stopped
+
   # API REST
   api:
     build:
@@ -106,6 +123,8 @@ services:
       SEAWEED_URL: http://seaweed-volume:8080
       # URL pública para acceder a imágenes (desde cliente externo)
       SEAWEED_PUBLIC_URL: https://bfts2026.mooo.com/seaweed
+      # URL del inference-server para inferencia interna (orquestador)
+      INFERENCE_SERVER_URL: http://inference-server:8000
     volumes:
       # Montar carpeta de modelos (solo lectura)
       - ./models/local:/app/models/local:ro
@@ -116,6 +135,7 @@ services:
     depends_on:
       - db
       - seaweed-volume
+      - inference-server
     networks:
       - api-detection-net
     restart: unless-stopped
@@ -130,3 +150,4 @@ volumes:
   pg_data:
   seaweed_master:
   seaweed_volume:
+  face_weights:
