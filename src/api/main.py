@@ -8,11 +8,12 @@ del sistema mediante el prefijo unificado /api y la documentación automática.
 
 import logging
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import models, detections, frames, persons, face_proxy
+from .services.auth import verify_token
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -46,11 +47,13 @@ app.add_middleware(
 
 # ===== INCLUIR ROUTERS (RUTAS) =====
 # Estos prefijos se agregan a las rutas definidas en cada router
-app.include_router(models.router, prefix="/api")       # GET /api/models
-app.include_router(detections.router, prefix="/api")   # POST /api/detections
-app.include_router(frames.router, prefix="/api")       # GET /api/frames, /api/frames/search
-app.include_router(persons.router, prefix="/api")      # POST/GET /api/persons
-app.include_router(face_proxy.router, prefix="/api")  # POST /api/faces/embeddings, /api/faces/recognize
+auth_deps = [Depends(verify_token)]
+
+app.include_router(models.router, prefix="/api", dependencies=auth_deps)       # GET /api/models
+app.include_router(detections.router, prefix="/api", dependencies=auth_deps)   # POST /api/detections
+app.include_router(frames.router, prefix="/api", dependencies=auth_deps)       # GET /api/frames, /api/frames/search
+app.include_router(persons.router, prefix="/api", dependencies=auth_deps)      # POST/GET /api/persons
+app.include_router(face_proxy.router, prefix="/api", dependencies=auth_deps)  # POST /api/faces/embeddings, /api/faces/recognize
 
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")

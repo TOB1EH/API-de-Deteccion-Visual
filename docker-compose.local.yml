@@ -66,6 +66,7 @@ services:
       - seaweed-volume
       - pgadmin
       - api
+      - keycloak
     networks:
       - api-detection-net-local
     restart: unless-stopped
@@ -83,6 +84,37 @@ services:
       - db
     restart: unless-stopped
 
+  # Keycloak (Autenticacion y Autorizacion)
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6
+    container_name: api_detection_keycloak_local
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HOSTNAME: localhost
+      KC_HTTP_PORT: 8080
+      KC_HTTP_RELATIVE_PATH: /auth
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      - db
+    networks:
+      - api-detection-net-local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/auth/realms/api-detection"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
   # API REST
   api:
     build:
@@ -94,8 +126,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SEAWEED_URL: http://seaweed-volume:8080
-      # Usamos el proxy nginx local para URLs públicas
       SEAWEED_PUBLIC_URL: http://localhost/seaweed
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro
