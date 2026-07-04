@@ -41,11 +41,11 @@
     <v-main>
       <v-container fluid class="pa-0" style="min-height: calc(100vh - 64px);">
         <router-view v-slot="{ Component, route }">
-          <v-fade-transition hide-on-leave>
+          <transition name="fade" mode="out-in">
             <keep-alive>
               <component :is="Component" :key="route.name" />
             </keep-alive>
-          </v-fade-transition>
+          </transition>
         </router-view>
       </v-container>
     </v-main>
@@ -87,6 +87,16 @@ function isActive(to) {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * { font-family: 'Inter', sans-serif; }
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
 html {
   overflow-y: auto;
