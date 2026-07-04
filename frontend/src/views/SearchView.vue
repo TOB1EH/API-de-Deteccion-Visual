@@ -7,8 +7,8 @@
           <p class="text-body-2 text-medium-emphasis mt-1">Filtra por clases detectadas y ubicacion geografica</p>
         </div>
         <v-spacer />
-        <v-chip v-if="result" color="primary" variant="tonal" size="small">
-          {{ result.total }} resultados
+        <v-chip v-if="searched" color="primary" variant="tonal" size="small">
+          {{ filteredFrames.length }} resultados
         </v-chip>
       </div>
     </v-col>
@@ -73,27 +73,6 @@
                     prepend-inner-icon="mdi-arrow-right-bold"
                   />
                 </v-col>
-                <v-col cols="6" md="3" lg="2">
-                  <v-text-field
-                    v-model="filters.limit"
-                    label="Por pagina"
-                    type="number"
-                    :min="1"
-                    :max="200"
-                    prepend-inner-icon="mdi-page-last"
-                    hide-details
-                  />
-                </v-col>
-                <v-col cols="6" md="3" lg="2">
-                  <v-text-field
-                    v-model="filters.offset"
-                    label="Offset"
-                    type="number"
-                    :min="0"
-                    prepend-inner-icon="mdi-page-first"
-                    hide-details
-                  />
-                </v-col>
               </v-row>
             </v-expansion-panel-text>
           </v-expansion-panel>
@@ -129,25 +108,16 @@
       </v-alert>
     </v-col>
 
-    <v-col v-if="result" cols="12">
+    <v-col v-if="searched && filteredFrames.length > 0" cols="12">
       <div class="d-flex align-center mb-4">
         <span class="text-body-1 text-medium-emphasis">
-          <strong class="text-primary">{{ result.total }}</strong> fotogramas encontrados
+          <strong class="text-primary">{{ filteredFrames.length }}</strong> fotogramas encontrados
         </span>
-        <v-spacer />
-        <v-pagination
-          v-if="totalPages > 1"
-          v-model="currentPage"
-          :length="totalPages"
-          :total-visible="5"
-          size="small"
-          @update:model-value="onPageChange"
-        />
       </div>
 
       <v-row>
         <v-col
-          v-for="frame in result.frames"
+          v-for="frame in filteredFrames"
           :key="frame.frame_id"
           cols="12"
           sm="6"
@@ -157,19 +127,17 @@
           <FrameCard :frame="frame" />
         </v-col>
       </v-row>
-
-      <div class="d-flex align-center justify-center mt-4">
-        <v-pagination
-          v-if="totalPages > 1"
-          v-model="currentPage"
-          :length="totalPages"
-          :total-visible="7"
-          @update:model-value="onPageChange"
-        />
-      </div>
     </v-col>
 
-    <v-col v-else-if="!loading" cols="12">
+    <v-col v-else-if="searched && filteredFrames.length === 0 && !loading" cols="12">
+      <v-empty-state
+        title="Sin resultados"
+        text="No se encontraron fotogramas con esos filtros"
+        icon="mdi-magnify-close"
+      />
+    </v-col>
+
+    <v-col v-else-if="!searched && !loading" cols="12">
       <v-card class="pa-12 d-flex flex-column align-center justify-center empty-state">
         <v-icon size="80" color="grey" class="mb-4">mdi-image-search</v-icon>
         <p class="text-h6 text-medium-emphasis">Usa los filtros y presiona Buscar</p>
@@ -186,28 +154,20 @@ import FrameCard from '../components/FrameCard.vue'
 
 const loading = ref(false)
 const error = ref('')
-const result = ref(null)
-const currentPage = ref(1)
+const searched = ref(false)
+const filteredFrames = ref([])
 
 const filters = reactive({
   clases: '',
   lat_min: '',
   lat_max: '',
   lon_min: '',
-  lon_max: '',
-  limit: 50,
-  offset: 0
+  lon_max: ''
 })
 
 const hasActiveFilters = computed(() =>
   filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max
 )
-
-const totalPages = computed(() => {
-  if (!result.value) return 0
-  const limit = parseInt(filters.limit) || 50
-  return Math.ceil(result.value.total / limit)
-})
 
 function resetFilters() {
   filters.clases = ''
@@ -215,30 +175,53 @@ function resetFilters() {
   filters.lat_max = ''
   filters.lon_min = ''
   filters.lon_max = ''
-  filters.limit = 50
-  filters.offset = 0
-  currentPage.value = 1
-  result.value = null
-}
-
-function onPageChange(page) {
-  filters.offset = (page - 1) * (parseInt(filters.limit) || 50)
-  doSearch()
+  searched.value = false
+  filteredFrames.value = []
 }
 
 function doSearch() {
+  searched.value = true
   loading.value = true
   error.value = ''
-  result.value = null
 
   setTimeout(() => {
-    result.value = {
-      ...MOCK_SEARCH_RESULTS,
-      total: MOCK_SEARCH_RESULTS.total,
-      frames: MOCK_SEARCH_RESULTS.frames
+    let frames = [...MOCK_SEARCH_RESULTS.frames]
+
+    if (filters.clases) {
+      const clasesBuscadas = filters.clases
+        .split(',')
+        .map(c => c.trim().toLowerCase())
+        .filter(Boolean)
+
+      if (clasesBuscadas.length > 0) {
+        frames = frames.filter(frame =>
+          frame.detections?.some(det =>
+            clasesBuscadas.some(c => det.class_name.toLowerCase().includes(c))
+          )
+        )
+      }
     }
+
+    if (filters.lat_min !== '') {
+      const val = parseFloat(filters.lat_min)
+      if (!isNaN(val)) frames = frames.filter(f => f.latitude >= val)
+    }
+    if (filters.lat_max !== '') {
+      const val = parseFloat(filters.lat_max)
+      if (!isNaN(val)) frames = frames.filter(f => f.latitude <= val)
+    }
+    if (filters.lon_min !== '') {
+      const val = parseFloat(filters.lon_min)
+      if (!isNaN(val)) frames = frames.filter(f => f.longitude >= val)
+    }
+    if (filters.lon_max !== '') {
+      const val = parseFloat(filters.lon_max)
+      if (!isNaN(val)) frames = frames.filter(f => f.longitude <= val)
+    }
+
+    filteredFrames.value = frames
     loading.value = false
-  }, 600)
+  }, 400)
 }
 </script>
 
