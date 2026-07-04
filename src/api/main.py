@@ -7,12 +7,15 @@ del sistema mediante el prefijo unificado /api y la documentación automática.
 """
 
 import logging
+import time
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import models, detections, frames, persons, face_proxy
+from .routes import models, detections, frames, persons, face_proxy, metrics
+from .routes.metrics import REQUEST_COUNT
+from .services.auth import verify_token
 from datetime import datetime, timezone
 
 logging.basicConfig(
@@ -44,6 +47,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===== MIDDLEWARE DE METRICAS =====
+
+@app.middleware("http")
+async def count_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    elapsed = time.time() - start_time
+    REQUEST_COUNT.labels(
+        endpoint=request.url.path,
+        method=request.method,
+        http_status=response.status_code,
+    ).inc()
+    return response
+
 # ===== INCLUIR ROUTERS (RUTAS) =====
 # Estos prefijos se agregan a las rutas definidas en cada router
 app.include_router(models.router, prefix="/api")       # GET /api/models
@@ -51,6 +68,7 @@ app.include_router(detections.router, prefix="/api")   # POST /api/detections
 app.include_router(frames.router, prefix="/api")       # GET /api/frames, /api/frames/search
 app.include_router(persons.router, prefix="/api")      # POST/GET /api/persons
 app.include_router(face_proxy.router, prefix="/api")  # POST /api/faces/embeddings, /api/faces/recognize
+app.include_router(metrics.router)                      # GET /metrics (sin auth)
 
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")
