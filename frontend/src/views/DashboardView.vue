@@ -22,11 +22,11 @@
             'upload-zone-has-file': imageFile,
             'upload-zone-disabled': loading
           }"
-          @dragenter.prevent="loading ? null : (isDragging = true)"
-          @dragover.prevent="loading ? null : (isDragging = true)"
+          @dragenter.prevent="!loading && (isDragging = true)"
+          @dragover.prevent="!loading && (isDragging = true)"
           @dragleave.prevent="isDragging = false"
-          @drop.prevent="loading ? null : onDrop"
-          @click="loading ? null : triggerFileInput"
+          @drop.prevent="!loading && onDrop($event)"
+          @click="!loading && triggerFileInput()"
         >
           <input
             ref="fileInput"
