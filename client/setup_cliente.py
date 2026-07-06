@@ -24,6 +24,7 @@ import sys
 import json
 import base64
 import io
+import glob
 import argparse
 import urllib.request
 import urllib.error
@@ -246,10 +247,16 @@ def start_container(models_dir):
     ]
     os.makedirs(face_weights_dir, exist_ok=True)
     cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
-    if "api_detection_api_local" in API_URL:
+    is_local = any(x in API_URL for x in ["localhost", "127.0.0.1", "api_detection_api_local"])
+    if is_local:
         cmd.extend(["--network", DOCKER_NETWORK])
-    cmd.extend(["-e", f"API_URL={API_URL}"])
-    cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
+        api_url_internal = API_URL.replace("localhost:8000", "api:8000") \
+                                 .replace("127.0.0.1:8000", "api:8000")
+        cmd.extend(["-e", f"API_URL={api_url_internal}"])
+    else:
+        cmd.extend(["-e", f"API_URL={API_URL}"])
+    deepface_backend = os.environ.get("DEEPFACE_BACKEND", "Facenet")
+    cmd.extend(["-e", f"DEEPFACE_BACKEND={deepface_backend}"])
     cmd.append(DOCKER_IMAGE)
     try:
         subprocess.run(cmd, check=True, timeout=60)
@@ -274,17 +281,6 @@ def cmd_install():
 
     if not check_docker():
         sys.exit(1)
-
-    if check_container_running():
-        models_dir = MODELS_DIR
-        os.makedirs(models_dir, exist_ok=True)
-        models = fetch_model_list()
-        if models:
-            selected = select_models(models)
-            for m in selected:
-                download_model(m["name"], models_dir)
-        print_ok("Todo listo. El nodo de inferencia local esta operativo.")
-        return
 
     if not pull_docker_image():
         sys.exit(1)
@@ -317,7 +313,8 @@ def cmd_install():
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py infer ruta/imagen.jpg --model {downloaded_model or 'yolo11n.pt'}{Colors.ENDC}")
     print()
     print(f"  Reconocimiento facial habilitado:")
-    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> foto.jpg{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> ruta/foto.jpg{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> ruta/directorio/{Colors.ENDC}")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5{Colors.ENDC}")
     print()
 
@@ -644,18 +641,9 @@ def cmd_persons_get(args):
 # ==============================================================================
 # COMANDO: faces
 # ==============================================================================
-def cmd_faces_embed(args):
-    person_id = args.person_id
-    image_path = args.image
-
-    if not os.path.exists(image_path):
-        print_error(f"Imagen no encontrada: {image_path}")
-        sys.exit(1)
-
+def _embed_one_image(person_id, image_path):
     with open(image_path, "rb") as f:
         img_data = f.read()
-
-    print_step(f"Enviando imagen a inference-server para generar embedding...")
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     body = (
         f"--{boundary}\r\n"
@@ -672,22 +660,58 @@ def cmd_faces_embed(args):
         f"{FACE_INFER_URL}/face/embed", data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode()
-        print_error(f"Error {e.code}: {error_body}")
-        sys.exit(1)
-    except Exception as e:
-        print_error(f"Error de conexion: {e}")
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read().decode())
+
+
+def cmd_faces_embed(args):
+    person_id = args.person_id
+    path_arg = args.path
+
+    if not os.path.exists(path_arg):
+        print_error(f"Ruta no encontrada: {path_arg}")
         sys.exit(1)
 
-    print_ok(f"Embedding generado:")
-    print(f"  Embedding ID: {result['embedding_id']}")
-    print(f"  Persona ID: {result['person_id']}")
-    print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
-    print(f"  Procesadas: {result['processed_images']}, Validas: {result['valid_embeddings']}, Rechazadas: {result['rejected_images']}")
+    if os.path.isdir(path_arg):
+        images = []
+        for ext in ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"):
+            images.extend(glob.glob(os.path.join(path_arg, ext)))
+        images.sort()
+        if not images:
+            print_error(f"No se encontraron imagenes (jpg/png) en: {path_arg}")
+            sys.exit(1)
+        print_step(f"Procesando {len(images)} imagenes desde: {path_arg}")
+    else:
+        images = [path_arg]
+
+    total = len(images)
+    success = 0
+    errors = 0
+
+    for i, image_path in enumerate(images, 1):
+        print(f"\n[{i}/{total}] {os.path.basename(image_path)}")
+        try:
+            result = _embed_one_image(person_id, image_path)
+            print_ok(f"Embedding ID: {result['embedding_id']}")
+            print(f"  Persona ID: {result['person_id']}")
+            print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
+            print(f"  Procesadas: {result['processed_images']}, "
+                  f"Validas: {result['valid_embeddings']}, "
+                  f"Rechazadas: {result['rejected_images']}")
+            success += 1
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode()
+            print_error(f"Error {e.code}: {error_body}")
+            errors += 1
+        except Exception as e:
+            print_error(f"Error de conexion: {e}")
+            errors += 1
+
+    print(f"\n{'='*50}")
+    print(f"  Resumen: {total} procesadas, {success} exitos, {errors} errores")
+    if errors:
+        print_warn(f"  {errors} imagen(es) fallaron, revisa las rutas y conexiones")
+    print(f"{'='*50}")
 
 
 def cmd_faces_recognize(args):
@@ -803,7 +827,8 @@ Ejemplos:
   python3 setup_cliente.py frames annotate <frame_id>
   python3 setup_cliente.py persons list
   python3 setup_cliente.py persons create "Juan" "Perez"
-  python3 setup_cliente.py faces embed <person_id> foto.jpg
+  python3 setup_cliente.py faces embed <person_id> ruta/foto.jpg
+  python3 setup_cliente.py faces embed <person_id> ruta/directorio/
   python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5
 
 Variables de entorno:
@@ -879,7 +904,7 @@ Variables de entorno:
 
     faces_embed = faces_sub.add_parser("embed", help="Generar embedding facial para una persona")
     faces_embed.add_argument("person_id", help="ID de la persona")
-    faces_embed.add_argument("image", help="Ruta a la imagen con el rostro")
+    faces_embed.add_argument("path", help="Ruta a la imagen o directorio con fotos del rostro")
     faces_embed.add_argument("--confidence", type=float, help="Confianza manual (0-1)")
 
     faces_recognize = faces_sub.add_parser("recognize", help="Reconocer rostro en una imagen")
