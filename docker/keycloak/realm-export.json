@@ -1,0 +1,139 @@
+{
+  "id": "api-detection",
+  "realm": "api-detection",
+  "displayName": "API Deteccion Visual",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "id": "admin",
+        "name": "admin",
+        "description": "Administrador con acceso completo",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "api-detection"
+      },
+      {
+        "id": "operator",
+        "name": "operator",
+        "description": "Operador con permisos de ejecucion",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "api-detection"
+      },
+      {
+        "id": "viewer",
+        "name": "viewer",
+        "description": "Visor con acceso solo lectura",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "api-detection"
+      }
+    ]
+  },
+  "groups": [],
+  "defaultRoles": ["viewer"],
+  "requiredCredentials": ["password"],
+  "clients": [
+    {
+      "id": "api-backend",
+      "clientId": "api-backend",
+      "name": "API Backend",
+      "description": "Cliente para la API REST de deteccion visual",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": ["https://bfts2026.mooo.com/*"],
+      "webOrigins": ["https://bfts2026.mooo.com"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "post.logout.redirect.uris": "+"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@bfts2026.mooo.com",
+      "firstName": "Admin",
+      "lastName": "Sistema",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "operator", "viewer"]
+    },
+    {
+      "username": "operator1",
+      "enabled": true,
+      "email": "operator1@bfts2026.mooo.com",
+      "firstName": "Operador",
+      "lastName": "Uno",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "op123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["operator", "viewer"]
+    },
+    {
+      "username": "viewer1",
+      "enabled": true,
+      "email": "viewer1@bfts2026.mooo.com",
+      "firstName": "Visor",
+      "lastName": "Uno",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "view123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "scopeMappings": [],
+  "clientScopeMappings": {},
+  "authenticationFlows": [],
+  "authenticatorConfig": [],
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyLookAheadWindow": 1,
+  "internationalizationEnabled": false,
+  "supportedLocales": [],
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  },
+  "smtpServer": {},
+  "eventsEnabled": false,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [],
+  "adminEventsEnabled": false,
+  "adminEventsDetailsEnabled": false
+}

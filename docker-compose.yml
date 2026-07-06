@@ -73,6 +73,7 @@ services:
       - seaweed-volume
       - pgadmin
       - api
+      - keycloak
     networks:
       - api-detection-net
     restart: unless-stopped
@@ -106,6 +107,38 @@ services:
       - face_weights:/root/.deepface/weights
     networks:
       - api-detection-net
+  # Keycloak (Autenticacion y Autorizacion)
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6
+    container_name: api_detection_keycloak
+    command: start --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HOSTNAME: bfts2026.mooo.com
+      KC_HTTP_PORT: 8080
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: forwarded
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      - db
+    networks:
+      - api-detection-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/auth/realms/api-detection"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
 
   # API REST
