@@ -646,7 +646,7 @@ def cmd_frames_annotate(args):
         print_error("Pillow no esta instalado. Ejecuta: pip install Pillow")
         sys.exit(1)
 
-    img = Image.open(io.BytesIO(image_bytes))
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     draw = ImageDraw.Draw(img)
 
     colores = [
