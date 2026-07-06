@@ -62,6 +62,22 @@ export const MOCK_PERSONS = {
   ]
 }
 
+export const MOCK_FRAME_DETAIL = {
+  frame_id: "a1b2c3d4-e5f6-7890-aaaa-bbbbccccdddd",
+  model_id: "yolo11n.pt",
+  latitude: -34.6037,
+  longitude: -58.3816,
+  image_url: "https://picsum.photos/800/600?random=1",
+  metadata: { camera_id: "cam-001", source: "web" },
+  detections_count: 2,
+  status: "processed",
+  created_at: "2026-06-28T12:00:00Z",
+  detections: [
+    { detection_id: "det-1", class_name: "person", class_id: 0, confidence: 0.95, bbox: { x_min: 150, y_min: 100, x_max: 450, y_max: 500 } },
+    { detection_id: "det-2", class_name: "car", class_id: 2, confidence: 0.87, bbox: { x_min: 50, y_min: 300, x_max: 350, y_max: 550 } }
+  ]
+}
+
 export const MOCK_RECOGNITION = {
   person_id: "p-1",
   nombre: "Juan",
