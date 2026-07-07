@@ -78,14 +78,3 @@ export const MOCK_FRAME_DETAIL = {
   ]
 }
 
-export const MOCK_RECOGNITION = {
-  person_id: "p-1",
-  nombre: "Juan",
-  apellido: "Perez",
-  confidence: 0.87
-}
-
-export const MOCK_RECOGNITION_FAIL = {
-  person_id: null,
-  confidence: 0.45
-}
