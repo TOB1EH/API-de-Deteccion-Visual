@@ -13,6 +13,7 @@ Subcomandos:
 
 Uso:
   export API_BASE=http://localhost  # backend local (default: remoto)
+  python3 setup_cliente.py faces login
   python3 setup_cliente.py install
   python3 setup_cliente.py infer foto.jpg --model yolo11n.pt
   python3 setup_cliente.py frames list --clases person
@@ -26,9 +27,11 @@ import json
 import base64
 import io
 import glob
+import time
 import argparse
 import urllib.request
 import urllib.error
+import urllib.parse
 import subprocess
 
 # ==============================================================================
@@ -45,6 +48,43 @@ CONTAINER_NAME = "yolo-inference-local"
 FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
 API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
+
+# Keycloak authentication
+TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".api_detection_token.json")
+KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", API_BASE)
+KEYCLOAK_REALM = "api-detection"
+KEYCLOAK_CLIENT_ID = "api-backend"
+
+
+def load_token():
+    if os.path.exists(TOKEN_FILE):
+        try:
+            with open(TOKEN_FILE) as f:
+                data = json.load(f)
+            expires_at = data.get("expires_at", 0)
+            if time.time() < expires_at - 60:
+                return data.get("access_token")
+        except (json.JSONDecodeError, KeyError, OSError):
+            pass
+    return None
+
+
+def save_token(access_token, expires_in):
+    data = {
+        "access_token": access_token,
+        "expires_at": time.time() + expires_in,
+    }
+    os.makedirs(os.path.dirname(TOKEN_FILE) or ".", exist_ok=True)
+    with open(TOKEN_FILE, "w") as f:
+        json.dump(data, f)
+    os.chmod(TOKEN_FILE, 0o600)
+
+
+def _auth_headers():
+    token = load_token()
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 
 # ==============================================================================
 # COLORES
@@ -79,26 +119,49 @@ def print_error(msg):
 # ==============================================================================
 # HELPERS HTTP
 # ==============================================================================
+def _exit_unauthorized():
+    print_error("Acceso no autorizado. Tu sesion expiro o no iniciaste sesion.")
+    print_error("Ejecuta: python3 setup_cliente.py faces login")
+    sys.exit(1)
+
+
 def api_get(path):
-    req = urllib.request.Request(f"{API_BASE}/api/{path}")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode())
+    req = urllib.request.Request(f"{API_BASE}/api/{path}", headers=_auth_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 def api_get_raw(path):
-    req = urllib.request.Request(f"{API_BASE}/api/{path}")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+    req = urllib.request.Request(f"{API_BASE}/api/{path}", headers=_auth_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 def api_post(path, data):
+    headers = {"Content-Type": "application/json"}
+    headers.update(_auth_headers())
     req = urllib.request.Request(
         f"{API_BASE}/api/{path}",
         data=json.dumps(data).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 # ==============================================================================
@@ -144,7 +207,7 @@ def pull_docker_image():
 def fetch_model_list():
     print_step("Consultando modelos disponibles en la nube...")
     try:
-        req = urllib.request.Request(f"{API_BASE}/api/models")
+        req = urllib.request.Request(f"{API_BASE}/api/models", headers=_auth_headers())
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
         models = data.get("models", [])
@@ -171,7 +234,7 @@ def download_model(model_name, models_dir):
     url = f"{API_BASE}/api/models/{model_name}/download"
     print_step(f"Descargando modelo '{model_name}'...")
     try:
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers=_auth_headers())
         with urllib.request.urlopen(req, timeout=120) as resp:
             total_size = int(resp.headers.get("Content-Length", 0))
             downloaded = 0
@@ -748,6 +811,46 @@ def _embed_one_image(person_id, image_path):
         return json.loads(resp.read().decode())
 
 
+def cmd_faces_login(args):
+    username = args.username
+    password = args.password
+
+    if not username:
+        username = input("Usuario: ")
+    if not password:
+        import getpass
+        password = getpass.getpass("Contrasena: ")
+
+    token_url = f"{KEYCLOAK_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
+    data = urllib.parse.urlencode({
+        "client_id": KEYCLOAK_CLIENT_ID,
+        "username": username,
+        "password": password,
+        "grant_type": "password",
+    }).encode()
+
+    req = urllib.request.Request(
+        token_url, data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        try:
+            err_detail = json.loads(error_body).get("error_description", error_body)
+        except json.JSONDecodeError:
+            err_detail = error_body
+        print_error(f"Error de autenticacion: {err_detail}")
+        sys.exit(1)
+
+    access_token = result["access_token"]
+    expires_in = result.get("expires_in", 3600)
+    save_token(access_token, expires_in)
+    print_ok(f"Sesion iniciada correctamente ({expires_in // 60} min de validez)")
+
+
 def cmd_faces_embed(args):
     person_id = args.person_id
     path_arg = args.path
@@ -902,6 +1005,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos:
+  python3 setup_cliente.py faces login
+  python3 setup_cliente.py faces login --username admin --password admin123
   python3 setup_cliente.py install
   python3 setup_cliente.py models list
   python3 setup_cliente.py models info yolo11n.pt
@@ -921,6 +1026,7 @@ Variables de entorno:
   MODELS_DIR         Directorio de modelos (default: ./modelos)
   INFER_URL          URL del servidor de inferencia local
   API_URL            URL de la API para persistencia facial (default: https://bfts2026.mooo.com)
+  KEYCLOAK_URL       URL de Keycloak para autenticacion (default: mismo que API_BASE)
         """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")
@@ -996,6 +1102,10 @@ Variables de entorno:
     faces_parser = subparsers.add_parser("faces", help="Reconocimiento facial (S5.2 y S5.3)")
     faces_sub = faces_parser.add_subparsers(dest="faces_subcommand", help="Subcomando")
 
+    faces_login = faces_sub.add_parser("login", help="Iniciar sesion en Keycloak")
+    faces_login.add_argument("--username", help="Nombre de usuario")
+    faces_login.add_argument("--password", help="Contrasena")
+
     faces_embed = faces_sub.add_parser("embed", help="Generar embedding facial para una persona")
     faces_embed.add_argument("person_id", help="ID de la persona")
     faces_embed.add_argument("path", help="Ruta a la imagen o directorio con fotos del rostro")
@@ -1039,7 +1149,9 @@ Variables de entorno:
         else:
             persons_parser.print_help()
     elif args.command == "faces":
-        if args.faces_subcommand == "embed":
+        if args.faces_subcommand == "login":
+            cmd_faces_login(args)
+        elif args.faces_subcommand == "embed":
             cmd_faces_embed(args)
         elif args.faces_subcommand == "recognize":
             cmd_faces_recognize(args)
