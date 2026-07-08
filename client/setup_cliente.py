@@ -45,7 +45,7 @@ DOCKER_IMAGE = "tfunes/inference-server:latest"
 CONTAINER_NAME = "yolo-inference-local"
 
 # Face recognition (DeepFace local via inference-server)
-FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
+FACE_INFER_URL = os.environ.get("FACE_INFER_URL", API_BASE + "/face")
 API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
 
@@ -874,6 +874,7 @@ def cmd_faces_embed(args):
     total = len(images)
     success = 0
     errors = 0
+    print(f"  Conectando a: {FACE_INFER_URL}/face/embed")
 
     for i, image_path in enumerate(images, 1):
         print(f"\n[{i}/{total}] {os.path.basename(image_path)}")
@@ -913,6 +914,7 @@ def cmd_faces_recognize(args):
 
     threshold = args.threshold
     print_step(f"Enviando imagen a inference-server para reconocimiento (threshold={threshold})...")
+    print(f"  Conectando a: {FACE_INFER_URL}/face/recognize")
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     body = (
         f"--{boundary}\r\n"
