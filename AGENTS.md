@@ -28,8 +28,9 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 - pgAdmin accesible en /pgadmin/
 - Let's Encrypt SSL activo
 
-**Nodo local (PC del usuario):**
+### Nodo local (PC del usuario):
 - inference-server (Docker: YOLO + DeepFace) en puerto 8001
+  - Detector: MTCNN | Modelo: Facenet | Normalizacion: Facenet
 - CLI setup_cliente.py descargable desde GET /setup_cliente.py
 
 ### Stack tecnologico
@@ -38,7 +39,7 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 |---|---|
 | Backend API | Python FastAPI |
 | Deteccion | Ultralytics YOLO |
-| Reconocimiento facial | DeepFace (Facenet) |
+| Reconocimiento facial | DeepFace (Facenet + MTCNN) |
 | BD | PostgreSQL 16 + pgvector |
 | Storage | SeaweedFS |
 | Proxy | Nginx + Let's Encrypt |
