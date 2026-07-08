@@ -45,7 +45,7 @@ DOCKER_IMAGE = "tfunes/inference-server:latest"
 CONTAINER_NAME = "yolo-inference-local"
 
 # Face recognition (DeepFace local via inference-server)
-FACE_INFER_URL = os.environ.get("FACE_INFER_URL", API_BASE + "/face")
+FACE_INFER_URL = os.environ.get("FACE_INFER_URL", API_BASE)
 API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
 
@@ -803,8 +803,9 @@ def _embed_one_image(person_id, image_path):
         f"--{boundary}--\r\n"
     ).encode()
 
+    url = FACE_INFER_URL.rstrip("/") + "/face/embed"
     req = urllib.request.Request(
-        f"{FACE_INFER_URL}/face/embed", data=body,
+        url, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
     with urllib.request.urlopen(req, timeout=120) as resp:
@@ -874,7 +875,7 @@ def cmd_faces_embed(args):
     total = len(images)
     success = 0
     errors = 0
-    print(f"  Conectando a: {FACE_INFER_URL}/face/embed")
+    print(f"  Conectando a: {FACE_INFER_URL.rstrip('/')}/face/embed")
 
     for i, image_path in enumerate(images, 1):
         print(f"\n[{i}/{total}] {os.path.basename(image_path)}")
@@ -914,7 +915,8 @@ def cmd_faces_recognize(args):
 
     threshold = args.threshold
     print_step(f"Enviando imagen a inference-server para reconocimiento (threshold={threshold})...")
-    print(f"  Conectando a: {FACE_INFER_URL}/face/recognize")
+    url = FACE_INFER_URL.rstrip("/") + "/face/recognize"
+    print(f"  Conectando a: {url}")
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     body = (
         f"--{boundary}\r\n"
@@ -928,7 +930,7 @@ def cmd_faces_recognize(args):
     ).encode()
 
     req = urllib.request.Request(
-        f"{FACE_INFER_URL}/face/recognize", data=body,
+        url, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
     try:
