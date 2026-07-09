@@ -63,12 +63,14 @@ async def count_requests(request: Request, call_next):
 
 # ===== INCLUIR ROUTERS (RUTAS) =====
 # Estos prefijos se agregan a las rutas definidas en cada router
-app.include_router(models.router, prefix="/api")       # GET /api/models
-app.include_router(detections.router, prefix="/api")   # POST /api/detections
-app.include_router(frames.router, prefix="/api")       # GET /api/frames, /api/frames/search
-app.include_router(persons.router, prefix="/api")      # POST/GET /api/persons
-app.include_router(face_proxy.router, prefix="/api")  # POST /api/faces/embeddings, /api/faces/recognize
-app.include_router(metrics.router)                      # GET /metrics (sin auth)
+auth_deps = [Depends(verify_token)]
+
+app.include_router(models.router, prefix="/api", dependencies=auth_deps)       # GET /api/models
+app.include_router(detections.router, prefix="/api", dependencies=auth_deps)   # POST /api/detections
+app.include_router(frames.router, prefix="/api", dependencies=auth_deps)       # GET /api/frames, /api/frames/search
+app.include_router(persons.router, prefix="/api", dependencies=auth_deps)      # POST/GET /api/persons
+app.include_router(face_proxy.router, prefix="/api", dependencies=auth_deps)  # POST /api/faces/embeddings, /api/faces/recognize
+app.include_router(metrics.router)  
 
 # ===== ENDPOINTS GLOBALES =====
 @app.get("/")

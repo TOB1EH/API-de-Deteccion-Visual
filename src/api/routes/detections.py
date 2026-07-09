@@ -1,23 +1,121 @@
 """
 Rutas para la gestión de detecciones.
+
+Incluye la funcion _run_inference() que permite a la API actuar como
+orquestador: si el cliente no envia detecciones pre-calculadas, la API
+las solicita internamente al inference-server.
 """
 
+import os
+import json
+import base64
+import urllib.request
+import urllib.error
 import logging
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from datetime import datetime, timezone
-from ..schemas.detection import DetectionRequest, DetectionResponse
+from ..schemas.detection import DetectionRequest, DetectionResponse, BboxSchema, SingleDetectionRequest
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 
 logger = logging.getLogger(__name__)
 
-# Enrutador para las rutas de detecciones, con prefijo /api/detections
 router = APIRouter(
     prefix="/detections",
     tags=["detections"],
-    responses={404: {"description": "Not found"}}, # Respuesta común para rutas de detecciones
+    responses={404: {"description": "Not found"}},
 )
+
+# ==============================================================================
+# FUNCION AUXILIAR: Llamar al inference-server para calcular detecciones
+# ==============================================================================
+
+def _run_inference(image_base64: str, model_id: str, confidence: float) -> list:
+    """
+    Envia la imagen al inference-server (YOLO) y devuelve las detecciones
+    en el formato esperado por el resto del flujo (SingleDetectionRequest).
+
+    La URL del inference-server se configura via variable de entorno
+    INFERENCE_SERVER_URL (default: http://localhost:8001).
+
+    Args:
+        image_base64: Imagen en base64
+        model_id: Nombre del modelo YOLO (ej: "yolo11n.pt")
+        confidence: Umbral de confianza (0.0 - 1.0)
+
+    Returns:
+        List[dict]: Lista de detecciones compatibles con SingleDetectionRequest
+
+    Raises:
+        HTTPException: Si no se puede conectar o el inference-server devuelve error
+    """
+    inference_url = os.getenv("INFERENCE_SERVER_URL", "http://localhost:8001")
+
+    # Decodificar base64 a bytes
+    image_bytes = base64.b64decode(image_base64.split(",")[-1])
+
+    # Armar multipart form-data (mismo formato que usa el CLI)
+    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="image"; filename="image.jpg"\r\n'
+        f"Content-Type: image/jpeg\r\n\r\n"
+    ).encode() + image_bytes + (
+        f"\r\n--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="model_name"\r\n\r\n'
+        f"{model_id}\r\n"
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="confidence"\r\n\r\n'
+        f"{confidence}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    req = urllib.request.Request(
+        f"{inference_url}/infer",
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            infer_result = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        raise HTTPException(
+            status_code=502,
+            detail=f"Inference server error ({e.code}): {error_body}"
+        )
+    except urllib.error.URLError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"No se puede conectar al inference server en {inference_url}: {e.reason}"
+        )
+
+    if infer_result["info"]["error"]:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Error en inferencia: {infer_result['info']['errormsg']}"
+        )
+
+    # Transformar al formato esperado por el resto del flujo
+    detections = []
+    for d in infer_result["results"]:
+        detections.append({
+            "class_name": d["classname"],
+            "class_id": d["classnumber"],
+            "confidence": round(d["conf"] / 100.0, 4),
+            "bbox": {
+                "x_min": int(d["bbox_object"]["x_min"]),
+                "y_min": int(d["bbox_object"]["y_min"]),
+                "x_max": int(d["bbox_object"]["x_max"]),
+                "y_max": int(d["bbox_object"]["y_max"]),
+            }
+        })
+
+    logger.info("Inferencia completada: %d objeto(s) detectado(s)", len(detections))
+    return detections
+
 
 @router.post("", response_model=DetectionResponse)
 async def process_detections(request: DetectionRequest):
@@ -44,6 +142,20 @@ async def process_detections(request: DetectionRequest):
         frame_id = str(uuid4())
         # timestamp en formato ISO 8601 UTC (ej: 2024-06-01T12:00:00Z)
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        # ===== PASO 0 (opcional): Ejecutar inferencia si no vienen detecciones pre-calculadas =====
+        if not request.detections:
+            logger.info("[%s] Sin detecciones pre-calculadas. Ejecutando inferencia via inference-server...", frame_id)
+            inferred_detections = _run_inference(
+                image_base64=request.image_base64,
+                model_id=request.model_id,
+                confidence=request.confidence or 0.25
+            )
+            # Reemplazar request.detections con las detecciones inferidas
+            request.detections = [
+                SingleDetectionRequest(**det) for det in inferred_detections
+            ]
+            logger.info("[%s] Inferencia completada: %d deteccion(es)", frame_id, len(request.detections))
 
         # ===== PASO 1: Subir imagen a SeaweedFS =====
         logger.info("[%s] Subiendo imagen a SeaweedFS...", frame_id)

@@ -7,11 +7,13 @@ Subcomandos:
   install    Descarga modelos y levanta contenedor de inferencia local
   models     Lista modelos disponibles en el backend
   infer      Infiere imagen localmente y sube resultados al backend
+  process    Envia imagen a la API para que ella haga la inferencia (orquestador)
   frames     Consulta y descarga fotogramas (list, get, annotate)
   persons    Gestiona personas registradas (list, create, get)
 
 Uso:
   export API_BASE=http://localhost  # backend local (default: remoto)
+  python3 setup_cliente.py faces login
   python3 setup_cliente.py install
   python3 setup_cliente.py infer foto.jpg --model yolo11n.pt
   python3 setup_cliente.py frames list --clases person
@@ -24,9 +26,12 @@ import sys
 import json
 import base64
 import io
+import glob
+import time
 import argparse
 import urllib.request
 import urllib.error
+import urllib.parse
 import subprocess
 
 # ==============================================================================
@@ -40,9 +45,46 @@ DOCKER_IMAGE = "tfunes/inference-server:latest"
 CONTAINER_NAME = "yolo-inference-local"
 
 # Face recognition (DeepFace local via inference-server)
-FACE_INFER_URL = os.environ.get("FACE_INFER_URL", "http://localhost:8001")
+FACE_INFER_URL = os.environ.get("FACE_INFER_URL", API_BASE)
 API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DOCKER_NETWORK = "api_de_deteccion_visual_api-detection-net-local"
+
+# Keycloak authentication
+TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".api_detection_token.json")
+KEYCLOAK_URL = os.environ.get("KEYCLOAK_URL", API_BASE)
+KEYCLOAK_REALM = "api-detection"
+KEYCLOAK_CLIENT_ID = "api-backend"
+
+
+def load_token():
+    if os.path.exists(TOKEN_FILE):
+        try:
+            with open(TOKEN_FILE) as f:
+                data = json.load(f)
+            expires_at = data.get("expires_at", 0)
+            if time.time() < expires_at - 60:
+                return data.get("access_token")
+        except (json.JSONDecodeError, KeyError, OSError):
+            pass
+    return None
+
+
+def save_token(access_token, expires_in):
+    data = {
+        "access_token": access_token,
+        "expires_at": time.time() + expires_in,
+    }
+    os.makedirs(os.path.dirname(TOKEN_FILE) or ".", exist_ok=True)
+    with open(TOKEN_FILE, "w") as f:
+        json.dump(data, f)
+    os.chmod(TOKEN_FILE, 0o600)
+
+
+def _auth_headers():
+    token = load_token()
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
 
 # ==============================================================================
 # COLORES
@@ -77,26 +119,49 @@ def print_error(msg):
 # ==============================================================================
 # HELPERS HTTP
 # ==============================================================================
+def _exit_unauthorized():
+    print_error("Acceso no autorizado. Tu sesion expiro o no iniciaste sesion.")
+    print_error("Ejecuta: python3 setup_cliente.py faces login")
+    sys.exit(1)
+
+
 def api_get(path):
-    req = urllib.request.Request(f"{API_BASE}/api/{path}")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode())
+    req = urllib.request.Request(f"{API_BASE}/api/{path}", headers=_auth_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 def api_get_raw(path):
-    req = urllib.request.Request(f"{API_BASE}/api/{path}")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+    req = urllib.request.Request(f"{API_BASE}/api/{path}", headers=_auth_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 def api_post(path, data):
+    headers = {"Content-Type": "application/json"}
+    headers.update(_auth_headers())
     req = urllib.request.Request(
         f"{API_BASE}/api/{path}",
         data=json.dumps(data).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _exit_unauthorized()
+        raise
 
 
 # ==============================================================================
@@ -142,7 +207,7 @@ def pull_docker_image():
 def fetch_model_list():
     print_step("Consultando modelos disponibles en la nube...")
     try:
-        req = urllib.request.Request(f"{API_BASE}/api/models")
+        req = urllib.request.Request(f"{API_BASE}/api/models", headers=_auth_headers())
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode())
         models = data.get("models", [])
@@ -169,7 +234,7 @@ def download_model(model_name, models_dir):
     url = f"{API_BASE}/api/models/{model_name}/download"
     print_step(f"Descargando modelo '{model_name}'...")
     try:
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers=_auth_headers())
         with urllib.request.urlopen(req, timeout=120) as resp:
             total_size = int(resp.headers.get("Content-Length", 0))
             downloaded = 0
@@ -246,10 +311,16 @@ def start_container(models_dir):
     ]
     os.makedirs(face_weights_dir, exist_ok=True)
     cmd.extend(["-v", f"{face_weights_dir}:/root/.deepface/weights"])
-    if "api_detection_api_local" in API_URL:
+    is_local = any(x in API_URL for x in ["localhost", "127.0.0.1", "api_detection_api_local"])
+    if is_local:
         cmd.extend(["--network", DOCKER_NETWORK])
-    cmd.extend(["-e", f"API_URL={API_URL}"])
-    cmd.extend(["-e", "DEEPFACE_BACKEND=Facenet"])
+        api_url_internal = API_URL.replace("localhost:8000", "api:8000") \
+                                 .replace("127.0.0.1:8000", "api:8000")
+        cmd.extend(["-e", f"API_URL={api_url_internal}"])
+    else:
+        cmd.extend(["-e", f"API_URL={API_URL}"])
+    deepface_backend = os.environ.get("DEEPFACE_BACKEND", "Facenet")
+    cmd.extend(["-e", f"DEEPFACE_BACKEND={deepface_backend}"])
     cmd.append(DOCKER_IMAGE)
     try:
         subprocess.run(cmd, check=True, timeout=60)
@@ -274,17 +345,6 @@ def cmd_install():
 
     if not check_docker():
         sys.exit(1)
-
-    if check_container_running():
-        models_dir = MODELS_DIR
-        os.makedirs(models_dir, exist_ok=True)
-        models = fetch_model_list()
-        if models:
-            selected = select_models(models)
-            for m in selected:
-                download_model(m["name"], models_dir)
-        print_ok("Todo listo. El nodo de inferencia local esta operativo.")
-        return
 
     if not pull_docker_image():
         sys.exit(1)
@@ -317,7 +377,8 @@ def cmd_install():
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py infer ruta/imagen.jpg --model {downloaded_model or 'yolo11n.pt'}{Colors.ENDC}")
     print()
     print(f"  Reconocimiento facial habilitado:")
-    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> foto.jpg{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> ruta/foto.jpg{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces embed <person_id> ruta/directorio/{Colors.ENDC}")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5{Colors.ENDC}")
     print()
 
@@ -387,8 +448,22 @@ def cmd_infer(args):
         INFER_URL, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        infer_result = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            infer_result = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print_error(f"Modelo '{model_name}' no encontrado en el contenedor local.")
+            print_error("Asegurate de haberlo descargado con: python3 setup_cliente.py install")
+            print_error("Tambien podes probar con el comando 'process' que usa la API en la nube.")
+            sys.exit(1)
+        else:
+            print_error(f"Error {e.code} del inference-server: {e.reason}")
+            sys.exit(1)
+    except urllib.error.URLError as e:
+        print_error(f"No se puede conectar al inference-server en {INFER_URL}.")
+        print_error("Asegurate de haber ejecutado: python3 setup_cliente.py install")
+        sys.exit(1)
 
     if infer_result["info"]["error"]:
         print_error(f"Error en inferencia: {infer_result['info']['errormsg']}")
@@ -441,6 +516,75 @@ def cmd_infer(args):
             f.write(resp.read())
     print_ok(f"Imagen anotada guardada: {annotated_path}")
     print()
+    print(f"  Para consultar este frame despues:")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames get {frame_id}{Colors.ENDC}")
+    print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames annotate {frame_id}{Colors.ENDC}")
+    print()
+
+
+# ==============================================================================
+# COMANDO: process
+# ==============================================================================
+def cmd_process(args):
+    """
+    Envia una imagen directamente a la API para que ella misma ejecute la
+    inferencia (via inference-server interno) y persista los resultados.
+
+    A diferencia de 'infer', este comando NO requiere tener el inference-server
+    corriendo localmente. La API en la nube orquesta todo el proceso.
+
+    Requiere que el servidor tenga configurada INFERENCE_SERVER_URL y que
+    el contenedor inference-server este corriendo en la misma red Docker.
+    """
+    image_path = args.image
+    if not os.path.exists(image_path):
+        print_error(f"Imagen no encontrada: {image_path}")
+        sys.exit(1)
+
+    with open(image_path, "rb") as f:
+        img_data = f.read()
+
+    model_name = args.model
+    confidence = args.confidence
+    lat = args.lat
+    lon = args.lon
+    camera_id = args.camera_id
+
+    print_step(f"Enviando imagen a {API_BASE}/api/detections para inferencia remota...")
+    print_step(f"Modelo: {model_name} | Confianza: {confidence} | Coordenadas: {lat}, {lon}")
+
+    image_b64 = base64.b64encode(img_data).decode("utf-8")
+    payload = {
+        "image_base64": f"data:image/jpeg;base64,{image_b64}",
+        "model_id": model_name,
+        "latitude": lat,
+        "longitude": lon,
+        "confidence": confidence,
+        "metadata": {
+            "camera_id": camera_id,
+            "source": "setup-cliente-process",
+        },
+    }
+
+    try:
+        result = api_post("detections", payload)
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        print_error(f"Error {e.code}: {error_body}")
+        sys.exit(1)
+    except Exception as e:
+        print_error(f"Error de conexion con {API_BASE}: {e}")
+        sys.exit(1)
+
+    frame_id = result["frame_id"]
+    print_ok(f"Procesado exitosamente!")
+    print(f"  Frame ID:      {frame_id}")
+    print(f"  Detecciones:   {result['detections_count']}")
+    print(f"  Estado:        {result['status']}")
+    print(f"  Mensaje:       {result['message']}")
+    print(f"  Imagen URL:    {result['image_url']}")
+    print()
+
     print(f"  Para consultar este frame despues:")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames get {frame_id}{Colors.ENDC}")
     print(f"    {Colors.OKCYAN}python3 setup_cliente.py frames annotate {frame_id}{Colors.ENDC}")
@@ -562,7 +706,7 @@ def cmd_frames_annotate(args):
         print_error("Pillow no esta instalado. Ejecuta: pip install Pillow")
         sys.exit(1)
 
-    img = Image.open(io.BytesIO(image_bytes))
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     draw = ImageDraw.Draw(img)
 
     colores = [
@@ -644,18 +788,9 @@ def cmd_persons_get(args):
 # ==============================================================================
 # COMANDO: faces
 # ==============================================================================
-def cmd_faces_embed(args):
-    person_id = args.person_id
-    image_path = args.image
-
-    if not os.path.exists(image_path):
-        print_error(f"Imagen no encontrada: {image_path}")
-        sys.exit(1)
-
+def _embed_one_image(person_id, image_path):
     with open(image_path, "rb") as f:
         img_data = f.read()
-
-    print_step(f"Enviando imagen a inference-server para generar embedding...")
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     body = (
         f"--{boundary}\r\n"
@@ -668,26 +803,104 @@ def cmd_faces_embed(args):
         f"--{boundary}--\r\n"
     ).encode()
 
+    url = FACE_INFER_URL.rstrip("/") + "/face/embed"
     req = urllib.request.Request(
-        f"{FACE_INFER_URL}/face/embed", data=body,
+        url, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read().decode())
+
+
+def cmd_faces_login(args):
+    username = args.username
+    password = args.password
+
+    if not username:
+        username = input("Usuario: ")
+    if not password:
+        import getpass
+        password = getpass.getpass("Contrasena: ")
+
+    token_url = f"{KEYCLOAK_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
+    data = urllib.parse.urlencode({
+        "client_id": KEYCLOAK_CLIENT_ID,
+        "username": username,
+        "password": password,
+        "grant_type": "password",
+    }).encode()
+
+    req = urllib.request.Request(
+        token_url, data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         error_body = e.read().decode()
-        print_error(f"Error {e.code}: {error_body}")
-        sys.exit(1)
-    except Exception as e:
-        print_error(f"Error de conexion: {e}")
+        try:
+            err_detail = json.loads(error_body).get("error_description", error_body)
+        except json.JSONDecodeError:
+            err_detail = error_body
+        print_error(f"Error de autenticacion: {err_detail}")
         sys.exit(1)
 
-    print_ok(f"Embedding generado:")
-    print(f"  Embedding ID: {result['embedding_id']}")
-    print(f"  Persona ID: {result['person_id']}")
-    print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
-    print(f"  Procesadas: {result['processed_images']}, Validas: {result['valid_embeddings']}, Rechazadas: {result['rejected_images']}")
+    access_token = result["access_token"]
+    expires_in = result.get("expires_in", 3600)
+    save_token(access_token, expires_in)
+    print_ok(f"Sesion iniciada correctamente ({expires_in // 60} min de validez)")
+
+
+def cmd_faces_embed(args):
+    person_id = args.person_id
+    path_arg = args.path
+
+    if not os.path.exists(path_arg):
+        print_error(f"Ruta no encontrada: {path_arg}")
+        sys.exit(1)
+
+    if os.path.isdir(path_arg):
+        images = []
+        for ext in ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"):
+            images.extend(glob.glob(os.path.join(path_arg, ext)))
+        images.sort()
+        if not images:
+            print_error(f"No se encontraron imagenes (jpg/png) en: {path_arg}")
+            sys.exit(1)
+        print_step(f"Procesando {len(images)} imagenes desde: {path_arg}")
+    else:
+        images = [path_arg]
+
+    total = len(images)
+    success = 0
+    errors = 0
+    print(f"  Conectando a: {FACE_INFER_URL.rstrip('/')}/face/embed")
+
+    for i, image_path in enumerate(images, 1):
+        print(f"\n[{i}/{total}] {os.path.basename(image_path)}")
+        try:
+            result = _embed_one_image(person_id, image_path)
+            print_ok(f"Embedding ID: {result['embedding_id']}")
+            print(f"  Persona ID: {result['person_id']}")
+            print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
+            print(f"  Procesadas: {result['processed_images']}, "
+                  f"Validas: {result['valid_embeddings']}, "
+                  f"Rechazadas: {result['rejected_images']}")
+            success += 1
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode()
+            print_error(f"Error {e.code}: {error_body}")
+            errors += 1
+        except Exception as e:
+            print_error(f"Error de conexion: {e}")
+            errors += 1
+
+    print(f"\n{'='*50}")
+    print(f"  Resumen: {total} procesadas, {success} exitos, {errors} errores")
+    if errors:
+        print_warn(f"  {errors} imagen(es) fallaron, revisa las rutas y conexiones")
+    print(f"{'='*50}")
 
 
 def cmd_faces_recognize(args):
@@ -702,6 +915,8 @@ def cmd_faces_recognize(args):
 
     threshold = args.threshold
     print_step(f"Enviando imagen a inference-server para reconocimiento (threshold={threshold})...")
+    url = FACE_INFER_URL.rstrip("/") + "/face/recognize"
+    print(f"  Conectando a: {url}")
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     body = (
         f"--{boundary}\r\n"
@@ -715,7 +930,7 @@ def cmd_faces_recognize(args):
     ).encode()
 
     req = urllib.request.Request(
-        f"{FACE_INFER_URL}/face/recognize", data=body,
+        url, data=body,
         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
     )
     try:
@@ -794,16 +1009,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos:
+  python3 setup_cliente.py faces login
+  python3 setup_cliente.py faces login --username admin --password admin123
   python3 setup_cliente.py install
   python3 setup_cliente.py models list
   python3 setup_cliente.py models info yolo11n.pt
   python3 setup_cliente.py infer foto.jpg --model yolo11n.pt
+  python3 setup_cliente.py process foto.jpg --model yolo11n.pt
   python3 setup_cliente.py frames list --clases person
   python3 setup_cliente.py frames get <frame_id>
   python3 setup_cliente.py frames annotate <frame_id>
   python3 setup_cliente.py persons list
   python3 setup_cliente.py persons create "Juan" "Perez"
-  python3 setup_cliente.py faces embed <person_id> foto.jpg
+  python3 setup_cliente.py faces embed <person_id> ruta/foto.jpg
+  python3 setup_cliente.py faces embed <person_id> ruta/directorio/
   python3 setup_cliente.py faces recognize foto.jpg --threshold 0.5
 
 Variables de entorno:
@@ -811,6 +1030,7 @@ Variables de entorno:
   MODELS_DIR         Directorio de modelos (default: ./modelos)
   INFER_URL          URL del servidor de inferencia local
   API_URL            URL de la API para persistencia facial (default: https://bfts2026.mooo.com)
+  KEYCLOAK_URL       URL de Keycloak para autenticacion (default: mismo que API_BASE)
         """,
     )
     subparsers = parser.add_subparsers(dest="command", help="Comando a ejecutar")
@@ -833,6 +1053,15 @@ Variables de entorno:
     infer_parser.add_argument("--lat", type=float, default=-34.6037, help="Latitud (default: -34.6037)")
     infer_parser.add_argument("--lon", type=float, default=-58.3816, help="Longitud (default: -58.3816)")
     infer_parser.add_argument("--camera-id", default="local-cam", help="ID de camara (default: local-cam)")
+
+    # process
+    process_parser = subparsers.add_parser("process", help="Envia imagen a la API para inferencia remota (orquestador)")
+    process_parser.add_argument("image", help="Ruta a la imagen a procesar")
+    process_parser.add_argument("--model", default="yolo11n.pt", help="Modelo YOLO a usar (default: yolo11n.pt)")
+    process_parser.add_argument("--confidence", type=float, default=0.25, help="Umbral de confianza (default: 0.25)")
+    process_parser.add_argument("--lat", type=float, default=-34.6037, help="Latitud (default: -34.6037)")
+    process_parser.add_argument("--lon", type=float, default=-58.3816, help="Longitud (default: -58.3816)")
+    process_parser.add_argument("--camera-id", default="local-cam", help="ID de camara (default: local-cam)")
 
     # frames
     frames_parser = subparsers.add_parser("frames", help="Operaciones con fotogramas")
@@ -877,9 +1106,13 @@ Variables de entorno:
     faces_parser = subparsers.add_parser("faces", help="Reconocimiento facial (S5.2 y S5.3)")
     faces_sub = faces_parser.add_subparsers(dest="faces_subcommand", help="Subcomando")
 
+    faces_login = faces_sub.add_parser("login", help="Iniciar sesion en Keycloak")
+    faces_login.add_argument("--username", help="Nombre de usuario")
+    faces_login.add_argument("--password", help="Contrasena")
+
     faces_embed = faces_sub.add_parser("embed", help="Generar embedding facial para una persona")
     faces_embed.add_argument("person_id", help="ID de la persona")
-    faces_embed.add_argument("image", help="Ruta a la imagen con el rostro")
+    faces_embed.add_argument("path", help="Ruta a la imagen o directorio con fotos del rostro")
     faces_embed.add_argument("--confidence", type=float, help="Confianza manual (0-1)")
 
     faces_recognize = faces_sub.add_parser("recognize", help="Reconocer rostro en una imagen")
@@ -899,6 +1132,8 @@ Variables de entorno:
             models_parser.print_help()
     elif args.command == "infer":
         cmd_infer(args)
+    elif args.command == "process":
+        cmd_process(args)
     elif args.command == "frames":
         if args.frames_subcommand == "list":
             cmd_frames_list(args)
@@ -918,7 +1153,9 @@ Variables de entorno:
         else:
             persons_parser.print_help()
     elif args.command == "faces":
-        if args.faces_subcommand == "embed":
+        if args.faces_subcommand == "login":
+            cmd_faces_login(args)
+        elif args.faces_subcommand == "embed":
             cmd_faces_embed(args)
         elif args.faces_subcommand == "recognize":
             cmd_faces_recognize(args)

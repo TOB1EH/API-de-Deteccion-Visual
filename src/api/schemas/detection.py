@@ -39,16 +39,20 @@ class MetadataSchema(BaseModel):
 class DetectionRequest(BaseModel):
     """
     Estructura de la solicitud POST /detections
+
+    Ahora soporta dos modos:
+    1. Con detecciones pre-calculadas (CLI tradicional): detections tiene la lista
+    2. Sin detecciones (frontend web): detections=None, la API las calcula via inference-server
     """
-    # ConfigDict para evitar que Pydantic trate de validar campos con nombres reservados
     model_config = ConfigDict(protected_namespaces=())
 
-    image_base64: str                          # Imagen codificada en base64
-    model_id: str                              # ID del modelo utilizado para la detección
-    latitude: float                            # Latitud de la ubicación donde se tomó la imagen
-    longitude: float                           # Longitud de la ubicación donde se tomó la imagen
-    detections: List[SingleDetectionRequest]   # Lista de detecciones en la imagen
-    metadata: Optional[MetadataSchema] = None  # Metadatos opcionales de la imagen
+    image_base64: str                                # Imagen codificada en base64
+    model_id: str                                    # ID del modelo utilizado para la detección
+    latitude: float                                  # Latitud de la ubicación donde se tomó la imagen
+    longitude: float                                 # Longitud de la ubicación donde se tomó la imagen
+    detections: Optional[List[SingleDetectionRequest]] = None  # Opcional: si no se envian, la API las calcula
+    confidence: Optional[float] = Field(default=0.25, ge=0, le=1)  # Umbral de confianza para inferencia (default: 0.25)
+    metadata: Optional[MetadataSchema] = None        # Metadatos opcionales de la imagen
 
 # Salida: Lo que el Servidor responde
 

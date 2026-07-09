@@ -24,3 +24,4 @@ watchfiles==1.2.0
 websockets==16.0
 Pillow==11.1.0
 prometheus-client==0.21.1
+python-jose[cryptography]==3.3.0
