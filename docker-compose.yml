@@ -74,6 +74,7 @@ services:
       - pgadmin
       - api
       - keycloak
+      - grafana
     networks:
       - api-detection-net
     restart: unless-stopped
@@ -221,6 +222,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_SERVER_ROOT_URL: https://bfts2026.mooo.com/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
     volumes:
       - grafana_data:/var/lib/grafana
