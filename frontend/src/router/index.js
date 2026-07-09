@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { authState } from '../services/auth'
 
 const routes = [
   {
@@ -43,6 +44,19 @@ const router = createRouter({
   routes,
   scrollBehavior() {
     return { top: 0 }
+  }
+})
+
+// Guard global: protege las rutas privadas
+// Si el usuario no esta autenticado via Keycloak, redirige a /login
+// La ruta /login esta siempre abierta
+router.beforeEach((to, from, next) => {
+  if (to.path === '/login' || to.path === '/') {
+    next()
+  } else if (!authState.authenticated) {
+    next('/login')
+  } else {
+    next()
   }
 })
 

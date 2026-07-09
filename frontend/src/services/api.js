@@ -13,7 +13,7 @@ import {
   MOCK_RECOGNITION,
   MOCK_RECOGNITION_FAIL
 } from './mock'
-import { getValidToken, logout } from './auth'
+import { authState } from './auth'
 
 // Instancia de axios configurada con la URL base de la API
 const api = axios.create({
@@ -24,23 +24,21 @@ const api = axios.create({
   }
 })
 
-// Interceptor de request: agrega token JWT a cada llamada
-api.interceptors.request.use(async (config) => {
-  const token = await getValidToken()
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// Interceptor de request: agrega token JWT de Keycloak a cada llamada
+api.interceptors.request.use((config) => {
+  if (authState.token) {
+    config.headers.Authorization = `Bearer ${authState.token}`
   }
   return config
 })
 
-// Interceptor de response: si da 401, limpia sesion y redirige al login
+// Interceptor de response: si da 401, redirige al login
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     if (error.response?.status === 401) {
-      logout()
-      if (window.location.hash !== '#/login') {
-        window.location.hash = '#/login'
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
       }
     }
     return Promise.reject(error)

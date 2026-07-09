@@ -20,40 +20,29 @@
           </p>
         </div>
 
-        <!-- Boton Keycloak -->
+        <!-- Boton Keycloak real -->
         <v-btn
           color="indigo-darken-2"
           block
           size="large"
           class="text-none py-5 mb-2"
           elevation="6"
-          @click="showKeycloakAlert = true"
+          @click="authService.login()"
         >
           <v-icon start size="22">mdi-key-variant</v-icon>
-          Acceder con Keycloak (OAuth2)
+          Iniciar sesion con Keycloak
         </v-btn>
 
-        <!-- Alerta Keycloak -->
-        <v-alert
-          v-if="showKeycloakAlert"
-          type="warning"
-          variant="tonal"
-          class="mb-4 mt-2"
-          density="compact"
-          border="start"
-          closable
-          @click:close="showKeycloakAlert = false"
-        >
-          <template v-slot:title>Autenticacion real no disponible</template>
-          Conexion con Keycloak en desarrollo para la Semana 2
-        </v-alert>
+        <p class="text-caption text-grey mt-1 mb-4 text-center">
+          Autenticacion corporativa OAuth2 con Keycloak
+        </p>
 
         <!-- Divisor -->
         <v-divider class="my-6 text-grey">
           O TAMBIEN PODIS
         </v-divider>
 
-        <!-- Modo demo -->
+        <!-- Modo demo (bypass para desarrollo) -->
         <v-btn
           variant="tonal"
           color="cyan-lighten-3"
@@ -62,7 +51,7 @@
           @click="$router.push('/cargar')"
         >
           <v-icon start size="18">mdi-test-tube</v-icon>
-          Modo Demo / Desarrollador
+          Ingresar en Modo Demo (Bypass)
         </v-btn>
 
         <v-alert
@@ -99,9 +88,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-
-const showKeycloakAlert = ref(false)
+import { authService } from '../services/auth'
 </script>
 
 <style scoped>
@@ -122,7 +109,6 @@ const showKeycloakAlert = ref(false)
   background: rgba(18, 26, 40, 0.85) !important;
 }
 
-/* Asegura que el gradiente se vea incluso en dark mode */
 .fill-height {
   min-height: 100vh;
 }

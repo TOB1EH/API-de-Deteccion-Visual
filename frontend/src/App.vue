@@ -29,10 +29,10 @@
       </v-btn>
 
       <!-- Usuario logueado y logout -->
-      <template v-if="user">
+      <template v-if="authState.authenticated && authState.user">
         <v-chip size="small" variant="tonal" color="primary" class="mr-2">
           <v-icon start size="14">mdi-account-circle</v-icon>
-          {{ user.username }}
+          {{ authState.user.username || authState.user.firstName }}
         </v-chip>
         <v-btn
           icon="mdi-logout"
@@ -70,24 +70,15 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { isAuthenticated, logout, getStoredUser } from './services/auth'
+import { authState, authService } from './services/auth'
 
 const route = useRoute()
 const router = useRouter()
-const user = ref(null)
-
-// Verifica si hay sesion activa al iniciar la app
-const storedUser = localStorage.getItem('auth_user')
-if (storedUser) {
-  try { user.value = JSON.parse(storedUser) } catch {}
-}
 
 const showAppBar = computed(() => route.name !== 'Login')
 
 function doLogout() {
-  logout()
-  user.value = null
-  router.push('/login')
+  authService.logout()
 }
 
 const stored = localStorage.getItem('theme')
