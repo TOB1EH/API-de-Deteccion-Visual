@@ -57,7 +57,9 @@
       <v-container fluid class="pa-0" style="min-height: calc(100vh - 64px);">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
-            <component :is="Component" :key="$route.fullPath" />
+            <div :key="$route.fullPath">
+              <component :is="Component" />
+            </div>
           </transition>
         </router-view>
       </v-container>
