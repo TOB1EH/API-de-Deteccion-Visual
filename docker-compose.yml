@@ -150,25 +150,84 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Conexión a PostgreSQL (desde dentro de Docker: nombre del container)
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      # Conexión a SeaweedFS (desde dentro de Docker: nombre del container)
       SEAWEED_URL: http://seaweed-volume:8080
-      # URL pública para acceder a imágenes (desde cliente externo)
       SEAWEED_PUBLIC_URL: https://bfts2026.mooo.com/seaweed
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
     volumes:
-      # Montar carpeta de modelos (solo lectura)
       - ./models/local:/app/models/local:ro
-      # Montar script de instalacion del cliente
       - ./client:/app/client:ro
-      # Montar código (para live reload en desarrollo)
       - ./src:/app/src
     depends_on:
       - db
       - seaweed-volume
       - inference-server
+    networks:
+      - api-detection-net
+    restart: unless-stopped
+
+  # InfluxDB (almacenamiento de metricas)
+  influxdb:
+    image: influxdb:2.8
+    container_name: api_detection_influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin123}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-soa}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-metrics}
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUXDB_RETENTION:-30d}
+    volumes:
+      - influxdb2_data:/var/lib/influxdb2
+      - influxdb2_config:/etc/influxdb2
+    networks:
+      - api-detection-net
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086", "--skip-verify"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Telegraf (recoleccion de metricas)
+  telegraf:
+    image: telegraf:1.38
+    container_name: api_detection_telegraf
+    hostname: "${HOSTNAME:-bfts2026.mooo.com}"
+    volumes:
+      - ./docker/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-soa}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-metrics}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - api-detection-net
+    restart: unless-stopped
+
+  # Grafana (visualizacion y alertas)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: api_detection_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    depends_on:
+      - influxdb
     networks:
       - api-detection-net
     restart: unless-stopped
@@ -183,4 +242,7 @@ volumes:
   pg_data:
   seaweed_master:
   seaweed_volume:
+  influxdb2_data:
+  influxdb2_config:
+  grafana_data:
   face_weights:
