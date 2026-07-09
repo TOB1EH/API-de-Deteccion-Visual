@@ -1,75 +1,84 @@
 <template>
-  <v-row align="center" justify="center" class="fill-height ma-0" :style="bgStyle">
+  <v-row align="center" justify="center" class="fill-height ma-0 bg-gradient">
     <v-col cols="12" sm="8" md="5" lg="4">
-      <v-card class="pa-8 glass-card" elevation="0">
+      <v-card
+        variant="outlined"
+        elevation="24"
+        max-width="450"
+        class="pa-8 glass-card border-cyber"
+      >
+        <!-- Cabecera -->
         <div class="text-center mb-6">
-          <v-avatar size="80" color="primary" class="mb-4 elevation-4">
-            <v-icon size="40" color="white">mdi-cctv</v-icon>
+          <v-avatar size="72" color="cyan-accent-3" class="mb-4" variant="tonal">
+            <v-icon size="36" color="cyan-accent-3">mdi-shield-eye</v-icon>
           </v-avatar>
-          <h1 class="text-h4 font-weight-bold mb-1">
-            <span class="text-primary">API</span> Deteccion
+          <h1 class="text-h5 font-weight-bold tracking-wide text-white">
+            <span class="text-cyan-accent-3">API</span> Deteccion Visual
           </h1>
-          <p class="text-body-2 text-medium-emphasis mt-1">
-            Sistema de analisis de fotogramas con deteccion y reconocimiento facial
+          <p class="text-grey-lighten-1 text-subtitle-2 mt-1">
+            Plataforma de Reconocimiento y Analisis de Fotogramas
           </p>
         </div>
 
-        <!-- Formulario de login con Keycloak -->
-        <v-form @submit.prevent="doLogin">
-          <v-text-field
-            v-model="username"
-            label="Usuario"
-            prepend-inner-icon="mdi-account"
-            :disabled="loading"
-            class="mb-3"
-            autocomplete="username"
-          />
-          <v-text-field
-            v-model="password"
-            label="Contrasena"
-            type="password"
-            prepend-inner-icon="mdi-lock"
-            :disabled="loading"
-            class="mb-4"
-            autocomplete="current-password"
-          />
-
-          <v-btn
-            color="primary"
-            block
-            size="x-large"
-            type="submit"
-            class="text-none py-5 mb-3"
-            elevation="4"
-            :loading="loading"
-          >
-            <v-icon start size="24">mdi-login</v-icon>
-            Iniciar sesion
-          </v-btn>
-        </v-form>
-
-        <v-alert v-if="loginError" type="error" variant="tonal" class="mb-4" density="compact" border="start">
-          {{ loginError }}
-        </v-alert>
-
-        <v-divider class="mb-4">
-          <span class="text-caption text-medium-emphasis px-2">o</span>
-        </v-divider>
-
+        <!-- Boton Keycloak -->
         <v-btn
-          variant="outlined"
+          color="indigo-darken-2"
           block
-          class="text-none mb-4"
-          color="grey"
-          :disabled="loading"
-          @click="$router.push('/cargar')"
+          size="large"
+          class="text-none py-5 mb-2"
+          elevation="6"
+          @click="showKeycloakAlert = true"
         >
-          <v-icon start size="16">mdi-test-tube</v-icon>
-          Modo demo (sin autenticacion)
+          <v-icon start size="22">mdi-key-variant</v-icon>
+          Acceder con Keycloak (OAuth2)
         </v-btn>
 
-        <div class="text-center mt-4">
-          <div class="d-flex justify-center ga-4 text-medium-emphasis">
+        <!-- Alerta Keycloak -->
+        <v-alert
+          v-if="showKeycloakAlert"
+          type="warning"
+          variant="tonal"
+          class="mb-4 mt-2"
+          density="compact"
+          border="start"
+          closable
+          @click:close="showKeycloakAlert = false"
+        >
+          <template v-slot:title>Autenticacion real no disponible</template>
+          Conexion con Keycloak en desarrollo para la Semana 2
+        </v-alert>
+
+        <!-- Divisor -->
+        <v-divider class="my-6 text-grey">
+          O TAMBIEN PODIS
+        </v-divider>
+
+        <!-- Modo demo -->
+        <v-btn
+          variant="tonal"
+          color="cyan-lighten-3"
+          block
+          class="text-none mb-3"
+          @click="$router.push('/cargar')"
+        >
+          <v-icon start size="18">mdi-test-tube</v-icon>
+          Modo Demo / Desarrollador
+        </v-btn>
+
+        <v-alert
+          variant="outlined"
+          density="compact"
+          color="amber-darken-2"
+          class="mt-2"
+          border="start"
+          icon="mdi-information-outline"
+        >
+          Entorno local de desarrollo. Los servicios reales se activaran en la Fase 2.
+        </v-alert>
+
+        <!-- Footer badges -->
+        <div class="text-center mt-6">
+          <div class="d-flex justify-center ga-4 text-grey-lighten-2">
             <span class="text-caption d-flex align-center">
               <v-icon size="14" class="mr-1">mdi-shield-check</v-icon>
               OAuth2
@@ -83,9 +92,6 @@
               Biometrico
             </span>
           </div>
-          <p class="text-caption text-medium-emphasis mt-3">
-            Usuarios de prueba: admin/admin123 &middot; viewer1/view123
-          </p>
         </div>
       </v-card>
     </v-col>
@@ -94,55 +100,30 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { loginWithKeycloak, storeUser } from '../services/auth'
 
-const router = useRouter()
-const username = ref('')
-const password = ref('')
-const loading = ref(false)
-const loginError = ref('')
-
-const bgStyle = {
-  background: 'linear-gradient(135deg, #1E3A5F 0%, #2563EB 50%, #7C3AED 100%)'
-}
-
-async function doLogin() {
-  if (!username.value || !password.value) {
-    loginError.value = 'Ingresa usuario y contrasena'
-    return
-  }
-
-  loading.value = true
-  loginError.value = ''
-
-  try {
-    const user = await loginWithKeycloak(username.value, password.value)
-    storeUser(user)
-    router.push('/cargar')
-  } catch (err) {
-    if (err.response?.status === 401) {
-      loginError.value = 'Usuario o contrasena incorrectos'
-    } else {
-      // Keycloak no disponible: entra como demo con los datos ingresados
-      const demoUser = { username: username.value, roles: ['demo'], email: '' }
-      storeUser(demoUser)
-      router.push('/cargar')
-    }
-  } finally {
-    loading.value = false
-  }
-}
+const showKeycloakAlert = ref(false)
 </script>
 
 <style scoped>
-.glass-card {
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.bg-gradient {
+  background: linear-gradient(135deg, #0a0e1a 0%, #0f1a2e 40%, #162240 100%) !important;
 }
+
+.glass-card {
+  background: rgba(18, 26, 40, 0.85) !important;
+  backdrop-filter: blur(16px);
+}
+
+.border-cyber {
+  border: 1px solid rgba(0, 200, 255, 0.25) !important;
+}
+
 .v-theme--dark .glass-card {
-  background: rgba(30, 41, 59, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 26, 40, 0.85) !important;
+}
+
+/* Asegura que el gradiente se vea incluso en dark mode */
+.fill-height {
+  min-height: 100vh;
 }
 </style>
