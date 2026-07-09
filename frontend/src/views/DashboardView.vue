@@ -211,7 +211,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { MOCK_MODELS, MOCK_FRAME_RESULT } from '../services/mock'
+import { getModels, postDetection, fileToBase64 } from '../services/api'
 
 const fileInput = ref(null)
 const imageFile = ref(null)
@@ -238,10 +238,15 @@ const canSubmit = computed(() =>
   !loading.value
 )
 
-onMounted(() => {
-  models.value = MOCK_MODELS.models
-  if (MOCK_MODELS.models.length > 0) {
-    form.model_id = MOCK_MODELS.models[0].name
+onMounted(async () => {
+  try {
+    const data = await getModels()
+    models.value = data.models
+    if (data.models.length > 0) {
+      form.model_id = data.models[0].name
+    }
+  } catch {
+    error.value = 'No se pudieron cargar los modelos'
   }
 })
 
@@ -284,19 +289,31 @@ async function copyFrameId() {
   }
 }
 
-function submitDetection() {
+async function submitDetection() {
   if (!canSubmit.value) return
   loading.value = true
   error.value = ''
   result.value = null
 
-  setTimeout(() => {
+  try {
+    const image_base64 = await fileToBase64(imageFile.value)
+    const res = await postDetection({
+      image_base64,
+      model_id: form.model_id,
+      latitude: parseFloat(form.latitude),
+      longitude: parseFloat(form.longitude),
+      confidence: form.confidence,
+      metadata: form.camera_id ? { camera_id: form.camera_id } : {}
+    })
     result.value = {
-      ...MOCK_FRAME_RESULT,
+      ...res,
       timestamp: new Date().toLocaleString()
     }
+  } catch (err) {
+    error.value = err.response?.data?.detail || err.message || 'Error al procesar el fotograma'
+  } finally {
     loading.value = false
-  }, 1500)
+  }
 }
 </script>
 

@@ -20,37 +20,49 @@ export const MOCK_FRAME_RESULT = {
   timestamp: new Date().toISOString()
 }
 
+function generateMockFrames() {
+  const clases = ['person', 'car', 'dog', 'bicycle', 'cat', 'truck', 'bus', 'motorcycle']
+  const cameras = ['cam-001', 'cam-002', 'cam-003', 'cam-004']
+  const framess = []
+
+  for (let i = 1; i <= 25; i++) {
+    const detCount = Math.floor(Math.random() * 4) + 1
+    const detections = []
+    for (let d = 1; d <= detCount; d++) {
+      const cls = clases[Math.floor(Math.random() * clases.length)]
+      detections.push({
+        detection_id: `det-frame-${i}-${d}`,
+        class_name: cls,
+        class_id: Math.floor(Math.random() * 80),
+        confidence: 0.5 + Math.random() * 0.5,
+        bbox: {
+          x_min: Math.floor(Math.random() * 400),
+          y_min: Math.floor(Math.random() * 200),
+          x_max: 200 + Math.floor(Math.random() * 400),
+          y_max: 100 + Math.floor(Math.random() * 400)
+        }
+      })
+    }
+
+    framess.push({
+      frame_id: `uuid-mock-${String(i).padStart(3, '0')}`,
+      model_id: i % 2 === 0 ? 'yolo11s.pt' : 'yolo11n.pt',
+      latitude: -34.6 - Math.random() * 0.1,
+      longitude: -58.4 - Math.random() * 0.1,
+      image_url: `https://picsum.photos/seed/frame${i}/400/300`,
+      metadata: { camera_id: cameras[Math.floor(Math.random() * cameras.length)], source: 'web' },
+      detections_count: detections.length,
+      created_at: new Date(2026, 5, 28 + Math.floor(i / 5), 12 + (i % 12), 0, 0).toISOString(),
+      detections
+    })
+  }
+
+  return framess
+}
+
 export const MOCK_SEARCH_RESULTS = {
   total: 25,
-  frames: [
-    {
-      frame_id: "uuid-1",
-      model_id: "yolo11n.pt",
-      latitude: -34.6037,
-      longitude: -58.3816,
-      image_url: "https://via.placeholder.com/400x300?text=Frame+1",
-      metadata: { camera_id: "cam-001", source: "web" },
-      detections_count: 3,
-      created_at: "2026-06-28T12:00:00Z",
-      detections: [
-        { detection_id: "det-1", class_name: "person", class_id: 0, confidence: 0.95, bbox: { x_min: 100, y_min: 200, x_max: 300, y_max: 400 } },
-        { detection_id: "det-2", class_name: "car", class_id: 2, confidence: 0.87, bbox: { x_min: 50, y_min: 150, x_max: 200, y_max: 300 } }
-      ]
-    },
-    {
-      frame_id: "uuid-2",
-      model_id: "yolo11s.pt",
-      latitude: -34.6137,
-      longitude: -58.3716,
-      image_url: "https://via.placeholder.com/400x300?text=Frame+2",
-      metadata: { camera_id: "cam-002", source: "mobile" },
-      detections_count: 1,
-      created_at: "2026-06-28T13:00:00Z",
-      detections: [
-        { detection_id: "det-3", class_name: "dog", class_id: 16, confidence: 0.92, bbox: { x_min: 200, y_min: 100, x_max: 400, y_max: 350 } }
-      ]
-    }
-  ]
+  frames: generateMockFrames()
 }
 
 export const MOCK_PERSONS = {
@@ -60,6 +72,24 @@ export const MOCK_PERSONS = {
     { person_id: "p-2", nombre: "Maria", apellido: "Garcia", email: "maria@mail.com", created_at: "2026-06-02", updated_at: "2026-06-02" },
     { person_id: "p-3", nombre: "Carlos", apellido: "Lopez", email: "carlos@mail.com", created_at: "2026-06-03", updated_at: "2026-06-03" }
   ]
+}
+
+// Mock de reconocimiento facial exitoso
+export const MOCK_RECOGNITION = {
+  person_id: "p-1",
+  nombre: "Juan",
+  apellido: "Perez",
+  confidence: 0.87,
+  image_url: "https://picsum.photos/200/200?random=face1"
+}
+
+// Mock de reconocimiento facial fallido
+export const MOCK_RECOGNITION_FAIL = {
+  person_id: null,
+  nombre: null,
+  apellido: null,
+  confidence: 0.45,
+  image_url: null
 }
 
 export const MOCK_FRAME_DETAIL = {

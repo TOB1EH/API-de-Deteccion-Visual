@@ -8,6 +8,12 @@
       <h2 class="text-h4 font-weight-bold">Detalle del fotograma</h2>
     </v-col>
 
+    <v-col cols="12">
+      <v-alert v-if="error" type="error" closable @click:close="error = ''" border="start">
+        {{ error }}
+      </v-alert>
+    </v-col>
+
     <v-col cols="12" lg="8">
       <v-card class="pa-2" :loading="!frame">
         <div
@@ -31,11 +37,11 @@
         </div>
 
         <div class="d-flex ga-2 mt-3 justify-end">
-          <v-btn variant="tonal" color="primary" class="text-none" size="small">
+          <v-btn variant="tonal" color="primary" class="text-none" size="small" @click="downloadImage('original')">
             <v-icon start size="16">mdi-download</v-icon>
             Original
           </v-btn>
-          <v-btn variant="tonal" class="text-none" size="small">
+          <v-btn variant="tonal" class="text-none" size="small" @click="downloadImage('thumbnail')">
             <v-icon start size="16">mdi-image-size-small</v-icon>
             Thumbnail
           </v-btn>
@@ -130,13 +136,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { MOCK_FRAME_DETAIL } from '../services/mock'
+import { getFrame } from '../services/api'
 import DetectionOverlay from '../components/DetectionOverlay.vue'
 
 defineProps({ id: String })
 const route = useRoute()
 
 const frame = ref(null)
+const error = ref('')
 const naturalWidth = ref(0)
 const naturalHeight = ref(0)
 
@@ -159,8 +166,14 @@ function onImageLoad(e) {
   naturalHeight.value = img.naturalHeight
 }
 
-onMounted(() => {
-  frame.value = { ...MOCK_FRAME_DETAIL, frame_id: route.params.id || MOCK_FRAME_DETAIL.frame_id }
+onMounted(async () => {
+  const frameId = route.params.id
+  try {
+    const data = await getFrame(frameId)
+    frame.value = data
+  } catch (err) {
+    error.value = 'Error al cargar el fotograma: ' + (err.response?.data?.detail || err.message)
+  }
 })
 </script>
 

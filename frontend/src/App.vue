@@ -28,6 +28,21 @@
         {{ item.label }}
       </v-btn>
 
+      <!-- Usuario logueado y logout -->
+      <template v-if="user">
+        <v-chip size="small" variant="tonal" color="primary" class="mr-2">
+          <v-icon start size="14">mdi-account-circle</v-icon>
+          {{ user.username }}
+        </v-chip>
+        <v-btn
+          icon="mdi-logout"
+          variant="text"
+          size="small"
+          @click="doLogout"
+          class="mr-2"
+        />
+      </template>
+
       <v-divider vertical class="mx-2" />
 
       <v-btn
@@ -41,9 +56,9 @@
     <v-main>
       <v-container fluid class="pa-0" style="min-height: calc(100vh - 64px);">
         <router-view v-slot="{ Component }">
-          <v-fade-transition hide-on-leave>
+          <transition name="fade" mode="out-in">
             <component :is="Component" :key="$route.fullPath" />
-          </v-fade-transition>
+          </transition>
         </router-view>
       </v-container>
     </v-main>
@@ -52,10 +67,26 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { isAuthenticated, logout, getStoredUser } from './services/auth'
 
 const route = useRoute()
+const router = useRouter()
+const user = ref(null)
+
+// Verifica si hay sesion activa al iniciar la app
+const storedUser = localStorage.getItem('auth_user')
+if (storedUser) {
+  try { user.value = JSON.parse(storedUser) } catch {}
+}
+
 const showAppBar = computed(() => route.name !== 'Login')
+
+function doLogout() {
+  logout()
+  user.value = null
+  router.push('/login')
+}
 
 const stored = localStorage.getItem('theme')
 const isDark = ref(stored !== 'light')
@@ -85,6 +116,16 @@ function isActive(to) {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 * { font-family: 'Inter', sans-serif; }
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
 html {
   overflow-y: auto;

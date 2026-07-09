@@ -129,7 +129,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { MOCK_PERSONS } from '../services/mock'
+import { getPersons, createPerson } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
 
 const search = ref('')
@@ -148,8 +148,13 @@ const filteredPersons = computed(() => {
   )
 })
 
-onMounted(() => {
-  persons.value = [...MOCK_PERSONS.persons]
+onMounted(async () => {
+  try {
+    const data = await getPersons()
+    persons.value = data.persons || []
+  } catch {
+    persons.value = []
+  }
 })
 
 function openNewDialog() {
@@ -160,16 +165,15 @@ function selectPerson(p) {
   selectedPerson.value = selectedPerson.value?.person_id === p.person_id ? null : p
 }
 
-function savePerson(personData) {
-  const newPerson = {
-    person_id: `p-${Date.now()}`,
-    ...personData,
-    created_at: new Date().toISOString().split('T')[0],
-    updated_at: new Date().toISOString().split('T')[0]
+async function savePerson(personData) {
+  try {
+    const newPerson = await createPerson(personData)
+    persons.value.unshift(newPerson)
+    dialog.value = false
+    selectedPerson.value = newPerson
+  } catch (err) {
+    console.error('Error al crear persona:', err)
   }
-  persons.value.unshift(newPerson)
-  dialog.value = false
-  selectedPerson.value = newPerson
 }
 
 function triggerFacesUpload() {

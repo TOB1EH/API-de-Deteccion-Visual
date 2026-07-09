@@ -113,11 +113,22 @@
         <span class="text-body-1 text-medium-emphasis">
           <strong class="text-primary">{{ filteredFrames.length }}</strong> fotogramas encontrados
         </span>
+        <v-spacer />
+        <v-select
+          v-model="itemsPerPage"
+          :items="[6, 12, 24, 48]"
+          label="Por pagina"
+          variant="outlined"
+          density="compact"
+          hide-details
+          class="max-w-120"
+          @update:model-value="page = 1"
+        />
       </div>
 
       <v-row>
         <v-col
-          v-for="frame in filteredFrames"
+          v-for="frame in paginatedFrames"
           :key="frame.frame_id"
           cols="12"
           sm="6"
@@ -127,6 +138,16 @@
           <FrameCard :frame="frame" />
         </v-col>
       </v-row>
+
+      <div class="d-flex justify-center mt-4">
+        <v-pagination
+          v-model="page"
+          :length="totalPages"
+          :total-visible="5"
+          rounded="circle"
+          color="primary"
+        />
+      </div>
     </v-col>
 
     <v-col v-else-if="searched && filteredFrames.length === 0 && !loading" cols="12">
@@ -149,13 +170,26 @@
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
-import { MOCK_SEARCH_RESULTS } from '../services/mock'
+import { searchFrames } from '../services/api'
 import FrameCard from '../components/FrameCard.vue'
 
 const loading = ref(false)
 const error = ref('')
 const searched = ref(false)
 const filteredFrames = ref([])
+const page = ref(1)
+const itemsPerPage = ref(12)
+
+// Calcula los frames a mostrar segun la pagina actual
+const paginatedFrames = computed(() => {
+  const start = (page.value - 1) * itemsPerPage.value
+  return filteredFrames.value.slice(start, start + itemsPerPage.value)
+})
+
+// Calcula el total de paginas disponibles
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredFrames.value.length / itemsPerPage.value))
+)
 
 const filters = reactive({
   clases: '',
@@ -179,49 +213,26 @@ function resetFilters() {
   filteredFrames.value = []
 }
 
-function doSearch() {
+async function doSearch() {
   searched.value = true
   loading.value = true
   error.value = ''
 
-  setTimeout(() => {
-    let frames = [...MOCK_SEARCH_RESULTS.frames]
-
-    if (filters.clases) {
-      const clasesBuscadas = filters.clases
-        .split(',')
-        .map(c => c.trim().toLowerCase())
-        .filter(Boolean)
-
-      if (clasesBuscadas.length > 0) {
-        frames = frames.filter(frame =>
-          frame.detections?.some(det =>
-            clasesBuscadas.some(c => det.class_name.toLowerCase().includes(c))
-          )
-        )
-      }
-    }
-
-    if (filters.lat_min !== '') {
-      const val = parseFloat(filters.lat_min)
-      if (!isNaN(val)) frames = frames.filter(f => f.latitude >= val)
-    }
-    if (filters.lat_max !== '') {
-      const val = parseFloat(filters.lat_max)
-      if (!isNaN(val)) frames = frames.filter(f => f.latitude <= val)
-    }
-    if (filters.lon_min !== '') {
-      const val = parseFloat(filters.lon_min)
-      if (!isNaN(val)) frames = frames.filter(f => f.longitude >= val)
-    }
-    if (filters.lon_max !== '') {
-      const val = parseFloat(filters.lon_max)
-      if (!isNaN(val)) frames = frames.filter(f => f.longitude <= val)
-    }
-
-    filteredFrames.value = frames
+  try {
+    const data = await searchFrames({
+      clases: filters.clases,
+      lat_min: filters.lat_min,
+      lat_max: filters.lat_max,
+      lon_min: filters.lon_min,
+      lon_max: filters.lon_max
+    })
+    filteredFrames.value = data.frames || []
+  } catch (err) {
+    error.value = err.response?.data?.detail || err.message || 'Error al buscar fotogramas'
+    filteredFrames.value = []
+  } finally {
     loading.value = false
-  }, 400)
+  }
 }
 </script>
 
@@ -229,4 +240,5 @@ function doSearch() {
 .empty-state {
   min-height: 300px;
 }
+.max-w-120 { max-width: 120px; }
 </style>

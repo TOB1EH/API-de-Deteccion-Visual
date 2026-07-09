@@ -55,7 +55,17 @@ services:
     networks:
       - api-detection-net
 
-  # Nginx (reverse proxy con HTTPS)
+  # Frontend (Vue + Vuetify)
+  frontend:
+    build: ./frontend
+    container_name: api_detection_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - api-detection-net
+    restart: unless-stopped
+
+# Nginx (reverse proxy con HTTPS)
   nginx:
     image: nginx:1.31.1
     container_name: api_detection_nginx
@@ -73,6 +83,7 @@ services:
       - seaweed-volume
       - pgadmin
       - api
+      - frontend
       - keycloak
     networks:
       - api-detection-net
