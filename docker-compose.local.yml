@@ -169,27 +169,73 @@ services:
       - api-detection-net-local
     restart: unless-stopped
 
-  # Face API (DeepFace - ahora integrado en inference-server, ver inference-server/main.py)
-  # face-api:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.face_api
-  #   container_name: api_detection_face_api_local
-  #   ports:
-  #     - "8002:8000"
-  #   environment:
-  #     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-  #     SEAWEED_URL: http://seaweed-volume:8080
-  #     DEEPFACE_BACKEND: Facenet
-  #   volumes:
-  #     - face_models_weights:/root/.deepface/weights
-  #     - ./src/face_api:/app/src/face_api
-  #   depends_on:
-  #     - db
-  #     - seaweed-volume
-  #   networks:
-  #     - api-detection-net-local
-  #   restart: unless-stopped
+  # InfluxDB (almacenamiento de metricas)
+  influxdb:
+    image: influxdb:2.8
+    container_name: api_detection_influxdb_local
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-admin123}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-soa}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-metrics}
+      DOCKER_INFLUXDB_INIT_RETENTION: ${INFLUXDB_RETENTION:-30d}
+    volumes:
+      - influxdb2_data:/var/lib/influxdb2
+      - influxdb2_config:/etc/influxdb2
+    networks:
+      - api-detection-net-local
+    healthcheck:
+      test: ["CMD", "influx", "ping", "--host", "http://localhost:8086", "--skip-verify"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Telegraf (recoleccion de metricas)
+  telegraf:
+    image: telegraf:1.38
+    container_name: api_detection_telegraf_local
+    hostname: "${HOSTNAME:-api-detection-local}"
+    volumes:
+      - ./docker/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-soa}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-metrics}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      api:
+        condition: service_started
+    networks:
+      - api-detection-net-local
+    restart: unless-stopped
+
+  # Grafana (visualizacion y alertas)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: api_detection_grafana_local
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    ports:
+      - "3000:3000"
+    depends_on:
+      - influxdb
+    networks:
+      - api-detection-net-local
+    restart: unless-stopped
+
 networks:
   api-detection-net-local:
     driver: bridge
@@ -200,4 +246,8 @@ volumes:
   seaweed_master_local:
   seaweed_volume_local:
   face_models_weights:
+  influxdb2_data:
+  influxdb2_config:
+  grafana_data:
   face_weights_local:
+
