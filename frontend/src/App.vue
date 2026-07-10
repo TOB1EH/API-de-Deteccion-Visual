@@ -98,7 +98,8 @@ const navItems = [
   { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar' },
   { to: '/buscar', icon: 'mdi-magnify', label: 'Buscar' },
   { to: '/personas', icon: 'mdi-account-group', label: 'Personas' },
-  { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial' }
+  { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial' },
+  { to: '/monitoreo', icon: 'mdi-monitor-dashboard', label: 'NOC' }
 ]
 
 function isActive(to) {

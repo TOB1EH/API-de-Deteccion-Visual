@@ -41,6 +41,11 @@ const routes = [
     path: '/facial',
     name: 'Facial',
     component: () => import('../views/FaceRecognitionView.vue')
+  },
+  {
+    path: '/monitoreo',
+    name: 'Monitoreo',
+    component: () => import('../views/MonitoreoView.vue')
   }
 ]
 
