@@ -48,9 +48,20 @@ const router = createRouter({
 })
 
 // Guard global: protege las rutas privadas
-// Si el usuario no esta autenticado via Keycloak, redirige a /login
-// La ruta /login esta siempre abierta
+// Orden: 1) Modo demo -> paso libre
+//        2) Loading true -> esperar, no bloquear aun
+//        3) /login y /  -> paso libre
+//        4) No autenticado -> redirige a /login
+//        5) Autenticado -> paso libre
 router.beforeEach((to, from, next) => {
+  if (authState.isDemoMode) {
+    next()
+    return
+  }
+  if (authState.loading) {
+    next()
+    return
+  }
   if (to.path === '/login' || to.path === '/') {
     next()
   } else if (!authState.authenticated) {

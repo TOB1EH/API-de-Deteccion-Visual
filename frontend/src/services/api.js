@@ -32,11 +32,14 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Interceptor de response: si da 401, redirige al login
+// Interceptor de response: si da 401, redirige al login SOLO en produccion
+// En desarrollo local (localhost) el token local no es valido contra la API remota,
+// entonces withFallback usa datos mock sin redirigir.
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !authState.isDemoMode && !isLocalDev) {
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }

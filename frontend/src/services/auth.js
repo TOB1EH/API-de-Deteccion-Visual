@@ -1,71 +1,87 @@
 // Servicio central de autenticacion con Keycloak (keycloak-js)
-// keycloak.js maneja el flujo OAuth2 completo (redirect, tokens, refresh)
 
 import Keycloak from 'keycloak-js'
 import { reactive } from 'vue'
 
-// Estado reactivo global accesible desde cualquier componente o guard
+// Estado reactivo global
 export const authState = reactive({
   authenticated: false,
+  isDemoMode: false,
   token: null,
   user: null,
   loading: true
 })
 
-// Configuracion del cliente Keycloak
-const keycloak = new Keycloak({
-  url: 'https://bfts2026.mooo.com/auth',
-  realm: 'detections-realm',
-  clientId: 'frontend-client'
-})
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
-async function handleInit(authenticated) {
-  if (authenticated) {
-    authState.token = keycloak.token
-    try {
-      const profile = await keycloak.loadUserProfile()
-      authState.user = {
-        username: profile.username,
-        email: profile.email,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        roles: keycloak.realmAccess?.roles || []
-      }
-    } catch {
-      authState.user = { username: 'unknown', roles: [] }
+// En local usa proxy de Vite (mismo origen, sin CORS en token exchange)
+const keycloakConfig = isLocalDev
+  ? { url: window.location.origin + '/auth', realm: 'api-detection', clientId: 'api-backend' }
+  : { url: 'https://bfts2026.mooo.com/auth', realm: 'api-detection', clientId: 'api-backend' }
+
+const keycloak = new Keycloak(keycloakConfig)
+
+function extractUserFromToken(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return {
+      username: payload.preferred_username || payload.sub,
+      email: payload.email || null,
+      firstName: payload.given_name || payload.preferred_username,
+      lastName: payload.family_name || '',
+      roles: payload.realm_access?.roles || []
     }
+  } catch {
+    return { username: 'unknown', roles: [] }
   }
-  authState.authenticated = authenticated
-  authState.loading = false
 }
 
 export const authService = {
-  // Inicializa Keycloak en segundo plano (check-sso, sin redirect inmediato)
   async init() {
     try {
+      // Limpiar solo hash viejos que NO contengan un codigo OAuth activo
+      if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
+        history.replaceState(null, '', window.location.pathname)
+      }
       authState.loading = true
       const authenticated = await keycloak.init({
-        onLoad: 'check-sso',
-        checkLoginIframe: false
+        onLoad: 'check-sso'
       })
-      await handleInit(authenticated)
-    } catch {
-      // Keycloak no disponible: modo offline, se puede acceder via demo
+      console.log('[Keycloak] init result - authenticated:', authenticated)
+      if (authenticated) {
+        authState.token = keycloak.token
+        authState.user = extractUserFromToken(keycloak.token)
+        console.log('[Keycloak] user from token:', authState.user)
+      }
+      authState.authenticated = authenticated
+      authState.loading = false
+      console.log('[Keycloak] authState after init:', { ...authState, token: authState.token?.substring(0, 20) + '...' })
+    } catch (err) {
+      console.error('[Keycloak] Error critico en init:', err)
       authState.loading = false
       authState.authenticated = false
     }
   },
 
-  // Redirige al usuario al formulario de login de Keycloak
   login() {
     keycloak.login({ redirectUri: window.location.origin + '/cargar' })
   },
 
-  // Cierra sesion y redirige al login
+  enableDemoMode() {
+    authState.authenticated = true
+    authState.isDemoMode = true
+    authState.token = 'mock-token-desarrollador'
+    authState.user = { firstName: 'Developer', lastName: 'Demo' }
+  },
+
   logout() {
+    const wasDemo = authState.isDemoMode
     authState.authenticated = false
+    authState.isDemoMode = false
     authState.token = null
     authState.user = null
-    keycloak.logout({ redirectUri: window.location.origin + '/login' })
+    if (!wasDemo) {
+      keycloak.logout({ redirectUri: window.location.origin + '/login' })
+    }
   }
 }
