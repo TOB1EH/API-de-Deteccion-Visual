@@ -116,7 +116,7 @@ const errorMessage = ref('')
 // Ningun guard ni interceptor puede revertir este estado (isDemoMode=true)
 function enterAsDemo() {
   authService.enableDemoMode()
-  router.push('/cargar')
+  router.push('/home')
 }
 
 // Keycloak login con timeout de seguridad

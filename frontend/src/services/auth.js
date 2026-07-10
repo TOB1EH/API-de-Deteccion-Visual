@@ -64,7 +64,7 @@ export const authService = {
   },
 
   login() {
-    keycloak.login({ redirectUri: window.location.origin + '/cargar' })
+    keycloak.login({ redirectUri: window.location.origin + '/home' })
   },
 
   enableDemoMode() {

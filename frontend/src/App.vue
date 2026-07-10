@@ -94,6 +94,7 @@ function toggleTheme() {
 }
 
 const navItems = [
+  { to: '/home', icon: 'mdi-view-dashboard', label: 'Inicio' },
   { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar' },
   { to: '/buscar', icon: 'mdi-magnify', label: 'Buscar' },
   { to: '/personas', icon: 'mdi-account-group', label: 'Personas' },

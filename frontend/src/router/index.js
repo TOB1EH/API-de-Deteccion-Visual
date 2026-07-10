@@ -4,7 +4,12 @@ import { authState } from '../services/auth'
 const routes = [
   {
     path: '/',
-    redirect: '/login'
+    redirect: '/home'
+  },
+  {
+    path: '/home',
+    name: 'Home',
+    component: () => import('../views/HomeView.vue')
   },
   {
     path: '/login',
@@ -48,11 +53,6 @@ const router = createRouter({
 })
 
 // Guard global: protege las rutas privadas
-// Orden: 1) Modo demo -> paso libre
-//        2) Loading true -> esperar, no bloquear aun
-//        3) /login y /  -> paso libre
-//        4) No autenticado -> redirige a /login
-//        5) Autenticado -> paso libre
 router.beforeEach((to, from, next) => {
   if (authState.isDemoMode) {
     next()
@@ -62,7 +62,7 @@ router.beforeEach((to, from, next) => {
     next()
     return
   }
-  if (to.path === '/login' || to.path === '/') {
+  if (to.path === '/login') {
     next()
   } else if (!authState.authenticated) {
     next('/login')
