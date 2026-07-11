@@ -92,6 +92,7 @@
             <iframe
               v-if="activeTab === 'host'"
               :src="urlHostMetrics"
+              :key="'host-' + iframeKey"
               width="100%"
               height="650"
               frameborder="0"
@@ -114,6 +115,7 @@
             <iframe
               v-if="activeTab === 'db'"
               :src="urlDbMetrics"
+              :key="'db-' + iframeKey"
               width="100%"
               height="650"
               frameborder="0"
@@ -136,6 +138,7 @@
             <iframe
               v-if="activeTab === 'yolo'"
               :src="urlYoloMetrics"
+              :key="'yolo-' + iframeKey"
               width="100%"
               height="650"
               frameborder="0"
@@ -160,13 +163,12 @@ const tab = ref('host')
 const refreshing = ref(false)
 const iframeKey = ref(0)
 
-// URL base de Grafana (placeholder - reemplazar con las URLs reales del servidor)
-// Ejemplo: https://bfts2026.mooo.com/grafana/d/xxxxx/host-metrics?orgId=1&kiosk=tv&from=now-6h&to=now
 const GRAFANA_BASE = 'https://bfts2026.mooo.com/grafana'
+const GRAFANA_DS = 'api_monitoring/api-deteccion-visual-monitoreo'
 
-const urlHostMetrics = ref(`${GRAFANA_BASE}/d/host/host-metrics?orgId=1&kiosk=tv&from=now-6h&to=now`)
-const urlDbMetrics = ref(`${GRAFANA_BASE}/d/db/database-metrics?orgId=1&kiosk=tv&from=now-6h&to=now`)
-const urlYoloMetrics = ref(`${GRAFANA_BASE}/d/yolo/yolo-metrics?orgId=1&kiosk=tv&from=now-6h&to=now`)
+const urlHostMetrics = ref(`${GRAFANA_BASE}/d/${GRAFANA_DS}?orgId=1&kiosk=tv&from=now-6h&to=now`)
+const urlDbMetrics = ref(`${GRAFANA_BASE}/d/${GRAFANA_DS}?orgId=1&kiosk=tv&from=now-6h&to=now`)
+const urlYoloMetrics = ref(`${GRAFANA_BASE}/d/${GRAFANA_DS}?orgId=1&kiosk=tv&from=now-6h&to=now`)
 
 // Fuerza recarga limpiando la key del iframe
 function refreshDashboards() {

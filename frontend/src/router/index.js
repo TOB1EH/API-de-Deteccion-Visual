@@ -29,8 +29,7 @@ const routes = [
   {
     path: '/frame/:id',
     name: 'FrameDetail',
-    component: () => import('../views/FrameDetailView.vue'),
-    props: true
+    component: () => import('../views/FrameDetailView.vue')
   },
   {
     path: '/personas',

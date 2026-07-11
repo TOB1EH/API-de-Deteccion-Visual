@@ -139,7 +139,6 @@ import { useRoute } from 'vue-router'
 import { getFrame } from '../services/api'
 import DetectionOverlay from '../components/DetectionOverlay.vue'
 
-defineProps({ id: String })
 const route = useRoute()
 
 const frame = ref(null)
@@ -168,11 +167,16 @@ function onImageLoad(e) {
 
 onMounted(async () => {
   const frameId = route.params.id
+  if (!frameId) {
+    error.value = 'ID de fotograma no valido'
+    return
+  }
   try {
     const data = await getFrame(frameId)
     frame.value = data
   } catch (err) {
     error.value = 'Error al cargar el fotograma: ' + (err.response?.data?.detail || err.message)
+    console.error('[FrameDetail] Error:', err)
   }
 })
 </script>

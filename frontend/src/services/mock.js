@@ -1,8 +1,12 @@
 export const MOCK_MODELS = {
-  total: 2,
+  total: 7,
   models: [
     { name: "yolo11n.pt", size: 4712345, type: "yolo", path: "models/local/yolo11n.pt" },
-    { name: "yolo11s.pt", size: 18123456, type: "yolo", path: "models/local/yolo11s.pt" }
+    { name: "celular.pt", size: 4123456, type: "yolo", path: "models/local/celular.pt" },
+    { name: "dados.pt", size: 3987654, type: "yolo", path: "models/local/dados.pt" },
+    { name: "mouse.pt", size: 4234567, type: "yolo", path: "models/local/mouse.pt" },
+    { name: "pelotas.pt", size: 4345678, type: "yolo", path: "models/local/pelotas.pt" },
+    { name: "ropa.pt", size: 4456789, type: "yolo", path: "models/local/ropa.pt" }
   ]
 }
 
