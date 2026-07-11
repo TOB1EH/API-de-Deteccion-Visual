@@ -9,9 +9,9 @@ las solicita internamente al inference-server.
 import os
 import json
 import base64
-import urllib.request
-import urllib.error
+import io
 import logging
+import requests
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from datetime import datetime, timezone
@@ -55,41 +55,26 @@ def _run_inference(image_base64: str, model_id: str, confidence: float) -> list:
     # Decodificar base64 a bytes
     image_bytes = base64.b64decode(image_base64.split(",")[-1])
 
-    # Armar multipart form-data (mismo formato que usa el CLI)
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="image"; filename="image.jpg"\r\n'
-        f"Content-Type: image/jpeg\r\n\r\n"
-    ).encode() + image_bytes + (
-        f"\r\n--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="model_name"\r\n\r\n'
-        f"{model_id}\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="confidence"\r\n\r\n'
-        f"{confidence}\r\n"
-        f"--{boundary}--\r\n"
-    ).encode()
-
-    req = urllib.request.Request(
-        f"{inference_url}/infer",
-        data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
-    )
-
+    # Enviar al inference-server via requests (multipart automático)
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            infer_result = json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode()
-        raise HTTPException(
-            status_code=502,
-            detail=f"Inference server error ({e.code}): {error_body}"
+        resp = requests.post(
+            f"{inference_url}/infer",
+            files={"image": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+            data={"model_name": model_id, "confidence": confidence},
+            timeout=120
         )
-    except urllib.error.URLError as e:
+        resp.raise_for_status()
+        infer_result = resp.json()
+    except requests.exceptions.ConnectionError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"No se puede conectar al inference server en {inference_url}: {e.reason}"
+            detail=f"No se puede conectar al inference server en {inference_url}: {e}"
+        )
+    except requests.exceptions.HTTPError as e:
+        error_body = e.response.text if e.response is not None else str(e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Inference server error ({e.response.status_code}): {error_body}"
         )
 
     if infer_result["info"]["error"]:

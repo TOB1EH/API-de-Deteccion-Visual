@@ -15,9 +15,12 @@ import {
 } from './mock'
 import { authState } from './auth'
 
-// Instancia de axios configurada con la URL base de la API
+// En local (npm run dev) apunta a la API local en puerto 8000
+// En produccion apunta al servidor remoto via Nginx
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+
 const api = axios.create({
-  baseURL: 'https://bfts2026.mooo.com/api/',
+  baseURL: isLocalDev ? 'http://localhost:8000/api/' : 'https://bfts2026.mooo.com/api/',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json'
@@ -33,9 +36,6 @@ api.interceptors.request.use((config) => {
 })
 
 // Interceptor de response: si da 401, redirige al login SOLO en produccion
-// En desarrollo local (localhost) el token local no es valido contra la API remota,
-// entonces withFallback usa datos mock sin redirigir.
-const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -101,11 +101,12 @@ export async function postDetection({ image_base64, model_id, latitude, longitud
 
 // --- Frames ---
 
-// GET /api/frames/{frameId} - Detalle de un fotograma
+// GET /api/frames/{frameId}/detail - Detalle de un fotograma (JSON con metadatos + detecciones)
+// El endpoint /api/frames/{id} devuelve la imagen binaria, no JSON. Por eso existe /detail.
 export async function getFrame(frameId) {
   return withFallback(
     async () => {
-      const { data } = await api.get(`/frames/${frameId}`)
+      const { data } = await api.get(`/frames/${frameId}/detail`)
       return data
     },
     async () => {

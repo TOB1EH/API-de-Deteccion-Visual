@@ -88,7 +88,7 @@ async def search_frames(
         raise HTTPException(status_code=500, detail=f"Error en busqueda: {str(e)}")
 
 @router.get("/{frame_id}")
-async def get_frame(frame_id: str, thumbnail: Optional[bool] = Query(False)):
+async def get_frame_image(frame_id: str, thumbnail: Optional[bool] = Query(False)):
     try:
         frame = db_service.get_frame_by_id(frame_id)
         if not frame:
@@ -116,4 +116,45 @@ async def get_frame(frame_id: str, thumbnail: Optional[bool] = Query(False)):
         raise
     except Exception as e:
         logger.exception("Error obteniendo frame")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+@router.get("/{frame_id}/detail")
+async def get_frame_detail(frame_id: str):
+    try:
+        frame = db_service.get_frame_by_id(frame_id)
+        if not frame:
+            raise HTTPException(status_code=404, detail=f"Frame {frame_id} no encontrado")
+
+        detections = db_service.get_frame_detections(frame_id)
+
+        return {
+            "frame_id": frame["frame_id"],
+            "model_id": frame["model_id"],
+            "latitude": float(frame["latitude"]),
+            "longitude": float(frame["longitude"]),
+            "image_url": frame["image_url"],
+            "detections_count": frame["detections_count"],
+            "metadata": {
+                "camera_id": frame.get("camera_id"),
+                "source": frame.get("source")
+            },
+            "created_at": frame["created_at"].isoformat() if hasattr(frame["created_at"], "isoformat") else str(frame["created_at"]),
+            "detections": [
+                {
+                    "detection_id": d["detection_id"],
+                    "class_name": d["class_name"],
+                    "class_id": d["class_id"],
+                    "confidence": float(d["confidence"]),
+                    "bbox": {
+                        "x_min": d["bbox_x_min"], "y_min": d["bbox_y_min"],
+                        "x_max": d["bbox_x_max"], "y_max": d["bbox_y_max"]
+                    }
+                } for d in detections
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error obteniendo detalle del frame")
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")

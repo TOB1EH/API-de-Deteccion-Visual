@@ -152,7 +152,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SEAWEED_URL: http://seaweed-volume:8080
-      SEAWEED_PUBLIC_URL: http://localhost/seaweed
+      SEAWEED_PUBLIC_URL: http://localhost:8090
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
