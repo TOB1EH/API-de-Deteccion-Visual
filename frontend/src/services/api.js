@@ -134,12 +134,20 @@ export async function getFrameThumbnail(frameId) {
 }
 
 // GET /api/frames/search - Busca fotogramas con filtros
+// Solo envia parametros con valor para evitar que FastAPI reciba strings
+// vacios que fallarian al parsear como float (ver Tarea 0.4)
 export async function searchFrames({ clases, lat_min, lat_max, lon_min, lon_max, limit, offset } = {}) {
   return withFallback(
     async () => {
-      const { data } = await api.get('/frames/search', {
-        params: { clases, lat_min, lat_max, lon_min, lon_max, limit, offset }
-      })
+      const params = {}
+      if (clases) params.clases = clases
+      if (lat_min !== undefined && lat_min !== '') params.lat_min = lat_min
+      if (lat_max !== undefined && lat_max !== '') params.lat_max = lat_max
+      if (lon_min !== undefined && lon_min !== '') params.lon_min = lon_min
+      if (lon_max !== undefined && lon_max !== '') params.lon_max = lon_max
+      if (limit !== undefined) params.limit = limit
+      if (offset !== undefined) params.offset = offset
+      const { data } = await api.get('/frames/search', { params })
       return data
     },
     async () => {

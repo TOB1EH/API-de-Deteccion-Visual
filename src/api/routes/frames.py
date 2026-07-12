@@ -24,26 +24,57 @@ router = APIRouter(
 
 @router.get("/search", response_model=FrameSearchResponse)
 async def search_frames(
-    lat_min: Optional[float] = Query(None),
-    lat_max: Optional[float] = Query(None),
-    lon_min: Optional[float] = Query(None),
-    lon_max: Optional[float] = Query(None),
+    # Usamos Optional[str] en vez de Optional[float] porque el frontend
+    # puede enviar strings vacios ("") cuando el usuario no completa el campo.
+    # FastAPI/Pydantic fallaria al parsear "" como float.
+    lat_min: Optional[str] = Query(None),
+    lat_max: Optional[str] = Query(None),
+    lon_min: Optional[str] = Query(None),
+    lon_max: Optional[str] = Query(None),
     clases: Optional[str] = Query(None),
     camera_id: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
+    # Si clases llega como string vacio, lo tratamos como None
+    if clases == "":
+        clases = None
+
+    # Convertimos los strings a float, manejando casos de string vacio o invalido
+    try:
+        lat_min_f = float(lat_min) if lat_min else None
+    except (ValueError, TypeError):
+        lat_min_f = None
+    try:
+        lat_max_f = float(lat_max) if lat_max else None
+    except (ValueError, TypeError):
+        lat_max_f = None
+    try:
+        lon_min_f = float(lon_min) if lon_min else None
+    except (ValueError, TypeError):
+        lon_min_f = None
+    try:
+        lon_max_f = float(lon_max) if lon_max else None
+    except (ValueError, TypeError):
+        lon_max_f = None
+
+    # Auto-swap si el usuario invirtio min y max
+    if lat_min_f is not None and lat_max_f is not None and lat_min_f > lat_max_f:
+        lat_min_f, lat_max_f = lat_max_f, lat_min_f
+    if lon_min_f is not None and lon_max_f is not None and lon_min_f > lon_max_f:
+        lon_min_f, lon_max_f = lon_max_f, lon_min_f
+
     try:
         class_list = [c.strip() for c in clases.split(",")] if clases else None
 
         filters = {}
-        if lat_min is not None and lat_max is not None:
-            filters["lat_min"] = lat_min
-            filters["lat_max"] = lat_max
-        if lon_min is not None and lon_max is not None:
-            filters["lon_min"] = lon_min
-            filters["lon_max"] = lon_max
+        if lat_min_f is not None and lat_max_f is not None:
+            filters["lat_min"] = lat_min_f
+            filters["lat_max"] = lat_max_f
+        if lon_min_f is not None and lon_max_f is not None:
+            filters["lon_min"] = lon_min_f
+            filters["lon_max"] = lon_max_f
         if class_list:
             filters["classes"] = class_list
         if camera_id is not None:

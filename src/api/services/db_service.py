@@ -283,10 +283,13 @@ class DatabaseService:
             if "lon_min" in filters and "lon_max" in filters:
                 conditions.append("longitude BETWEEN %s AND %s")
                 params.extend([filters["lon_min"], filters["lon_max"]])
+            # Case-insensitive: LOWER() en BD y filtro en minusculas para
+            # que "Ball", "ball", "BALL" matcheen (ver Tarea 0.4)
             if "classes" in filters:
-                placeholders = ",".join(["%s"] * len(filters["classes"]))
-                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
-                params.extend(filters["classes"])
+                lower_classes = [c.lower() for c in filters["classes"]]
+                placeholders = ",".join(["%s"] * len(lower_classes))
+                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE LOWER(class_name) IN ({placeholders}))")
+                params.extend(lower_classes)
             if "camera_id" in filters:
                 conditions.append("camera_id = %s")
                 params.append(filters["camera_id"])
@@ -328,10 +331,13 @@ class DatabaseService:
             if "lon_min" in filters and "lon_max" in filters:
                 conditions.append("longitude BETWEEN %s AND %s")
                 params.extend([filters["lon_min"], filters["lon_max"]])
+            # Case-insensitive: LOWER() en BD y filtro en minusculas para
+            # que "Ball", "ball", "BALL" matcheen (ver Tarea 0.4)
             if "classes" in filters:
-                placeholders = ",".join(["%s"] * len(filters["classes"]))
-                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE class_name IN ({placeholders}))")
-                params.extend(filters["classes"])
+                lower_classes = [c.lower() for c in filters["classes"]]
+                placeholders = ",".join(["%s"] * len(lower_classes))
+                conditions.append(f"frame_id IN (SELECT DISTINCT frame_id FROM detections WHERE LOWER(class_name) IN ({placeholders}))")
+                params.extend(lower_classes)
             if "camera_id" in filters:
                 conditions.append("camera_id = %s")
                 params.append(filters["camera_id"])
