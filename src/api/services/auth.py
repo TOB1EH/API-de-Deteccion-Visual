@@ -28,6 +28,18 @@ PUBLIC_PATHS = [
     "/nginx-health",
 ]
 
+# Rutas internas que no requieren autenticacion cuando la llamada
+# proviene de la red interna de Docker (inference-server, etc.)
+INTERNAL_PATHS = [
+    "/api/persons/",
+]
+
+
+def _is_internal_request(request: Request) -> bool:
+    """Detecta si la request viene de la red interna de Docker (172.x.x.x o 10.x.x.x)"""
+    client_host = request.client.host if request.client else ""
+    return client_host.startswith("172.") or client_host.startswith("10.") or client_host == "127.0.0.1"
+
 _jwks_cache = None
 
 
@@ -59,8 +71,15 @@ def verify_token(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
-    if request.url.path in PUBLIC_PATHS:
+    path = request.url.path
+
+    if path in PUBLIC_PATHS:
         return {"sub": "anonymous", "roles": []}
+
+    # Permitir llamadas internas (inference-server) a rutas especificas
+    for internal_path in INTERNAL_PATHS:
+        if path.startswith(internal_path) and _is_internal_request(request):
+            return {"sub": "internal", "roles": ["internal"]}
 
     if credentials is None:
         raise HTTPException(

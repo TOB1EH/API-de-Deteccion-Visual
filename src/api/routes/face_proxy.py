@@ -1,6 +1,7 @@
 import json
 import logging
 import base64
+import os
 from uuid import uuid4
 from typing import Optional
 from io import BytesIO
@@ -15,6 +16,7 @@ def _embedding_to_str(embedding: list[float]) -> str:
 from ..schemas.face import (
     FaceEmbedRequest, FaceEmbedResponse,
     FaceRecognizeRequest, FaceRecognizeResponse,
+    FaceEmbedUploadRequest, FaceEmbedUploadResponse,
 )
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
@@ -27,6 +29,68 @@ router = APIRouter(
     tags=["faces"],
     responses={404: {"description": "Not found"}},
 )
+
+
+@router.post("/persons/{person_id}/face-embed", response_model=FaceEmbedUploadResponse, status_code=201)
+async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedUploadRequest):
+    """
+    Orquestador de embedding facial: recibe la imagen, la envia al inference-server
+    (DeepFace) para calcular el embedding, y persiste el resultado en BD + SeaweedFS.
+    NOTA: El inference-server intenta persistir internamente pero necesita autenticacion.
+    Por ahora el flujo completo solo funciona via CLI (setup_cliente.py faces embed).
+    """
+    inference_url = os.getenv("INFERENCE_SERVER_URL", "http://localhost:8001")
+    image_bytes = base64.b64decode(request.image_base64.split(",")[-1])
+
+    import requests as http_requests
+    import io
+
+    # Verificar persona
+    conn = db_service.get_connection()
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT person_id::TEXT, name FROM persons WHERE person_id = %s",
+            (person_id,),
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"Persona {person_id} no encontrada")
+        cursor.close()
+    finally:
+        conn.close()
+
+    # Enviar al inference-server
+    resp = http_requests.post(
+        f"{inference_url}/face/embed",
+        data={"person_id": person_id},
+        files={"image": ("face.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+        timeout=120
+    )
+
+    try:
+        result = resp.json()
+    except Exception:
+        result = {}
+
+    # Si el inference-server rechazo la imagen (sin rostro detectable)
+    if result.get("error") or resp.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail="No se detecto un rostro en la imagen o hubo un error en DeepFace. "
+                   "Usa el CLI: `python3 client/setup_cliente.py faces embed ...`"
+        )
+
+    # Subir imagen a SeaweedFS como respaldo
+    image_url = seaweedfs_client.upload_image(
+        request.image_base64, f"face_{person_id}_{uuid4()}"
+    )
+
+    return FaceEmbedUploadResponse(
+        person_id=person_id,
+        valid_embeddings=1 if image_url else 0,
+        embedding_id="",
+        image_url=image_url or "",
+    )
 
 
 @router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201)

@@ -105,6 +105,22 @@
             @change="onFacesSelected"
           />
         </div>
+        <v-alert
+          v-if="uploadMsg"
+          :type="uploadError ? 'error' : 'success'"
+          density="compact"
+          variant="tonal"
+          closable
+          class="mt-3"
+          @click:close="uploadMsg = ''"
+        >
+          <v-icon start>{{ uploadError ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>
+          <span v-if="uploading">
+            <v-progress-circular indeterminate size="16" width="2" class="mr-2" />
+            {{ uploadMsg }}
+          </span>
+          <span v-else>{{ uploadMsg }}</span>
+        </v-alert>
       </v-card>
     </v-col>
   </v-row>
@@ -129,7 +145,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getPersons, createPerson } from '../services/api'
+import { getPersons, createPerson, postFaceEmbed, fileToBase64 } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
 
 const search = ref('')
@@ -137,6 +153,9 @@ const persons = ref([])
 const dialog = ref(false)
 const selectedPerson = ref(null)
 const facesInput = ref(null)
+const uploading = ref(false)
+const uploadMsg = ref('')
+const uploadError = ref(false)
 
 const filteredPersons = computed(() => {
   if (!search.value) return persons.value
@@ -180,11 +199,45 @@ function triggerFacesUpload() {
   facesInput.value?.click()
 }
 
-function onFacesSelected(e) {
+async function onFacesSelected(e) {
   const files = e.target.files
-  if (files?.length) {
-    console.log(`Subiendo ${files.length} foto(s) facial(es) para ${selectedPerson.value?.nombre}`)
+  if (!files?.length || !selectedPerson.value) return
+
+  uploading.value = true
+  uploadMsg.value = `Subiendo ${files.length} foto(s)...`
+  uploadError.value = false
+
+  let successCount = 0
+  let failCount = 0
+
+  for (const file of files) {
+    try {
+      const image_base64 = await fileToBase64(file)
+      const result = await postFaceEmbed(selectedPerson.value.person_id, {
+        image_base64,
+        confidence: 0.8
+      })
+      if (result.valid_embeddings > 0) {
+        successCount++
+      } else {
+        failCount++
+      }
+    } catch {
+      failCount++
+    }
   }
+
+  uploading.value = false
+  if (failCount === 0) {
+    uploadMsg.value = `${successCount} foto(s) procesada(s) correctamente`
+    uploadError.value = false
+  } else {
+    uploadMsg.value = `${successCount} exitosa(s), ${failCount} fallida(s)`
+    uploadError.value = true
+  }
+
+  // Limpiar el input para permitir reseleccionar el mismo archivo
+  e.target.value = ''
 }
 </script>
 

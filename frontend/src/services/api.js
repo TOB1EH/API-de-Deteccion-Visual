@@ -215,18 +215,20 @@ export async function createPerson(personData) {
   )
 }
 
-// POST /api/persons/{personId}/embeddings - Sube fotos faciales
-export async function postEmbeddings(personId, formData) {
+// POST /api/persons/{personId}/face-embed - Sube foto facial y genera embedding
+// Envia imagen en base64, la API la envia al inference-server (DeepFace)
+// y persiste embedding + imagen en BD + SeaweedFS
+export async function postFaceEmbed(personId, { image_base64, confidence }) {
   return withFallback(
     async () => {
-      const { data } = await api.post(`/persons/${personId}/embeddings`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const { data } = await api.post(`/persons/${personId}/face-embed`, {
+        image_base64, confidence
       })
       return data
     },
     async () => {
-      await delay(1000)
-      return { person_id: personId, processed_images: 2, valid_embeddings: 1, rejected_images: 0 }
+      await delay(1500)
+      return { person_id: personId, valid_embeddings: 1, embedding_id: `mock-${Date.now()}`, image_url: '' }
     }
   )
 }
