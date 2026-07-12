@@ -224,13 +224,16 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - influxdb
     networks:

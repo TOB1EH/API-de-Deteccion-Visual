@@ -163,7 +163,8 @@ const tab = ref('host')
 const refreshing = ref(false)
 const iframeKey = ref(0)
 
-const GRAFANA_BASE = 'https://bfts2026.mooo.com/grafana'
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const GRAFANA_BASE = isLocalDev ? 'http://localhost:3001' : 'https://bfts2026.mooo.com/grafana'
 const GRAFANA_DS = 'api_monitoring/api-deteccion-visual-monitoreo'
 
 const urlHostMetrics = ref(`${GRAFANA_BASE}/d/${GRAFANA_DS}?orgId=1&kiosk=tv&from=now-6h&to=now`)
