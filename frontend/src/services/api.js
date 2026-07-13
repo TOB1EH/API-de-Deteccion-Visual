@@ -75,6 +75,22 @@ export async function getModels() {
   )
 }
 
+// GET /api/models/{modelName} - Obtiene detalle de un modelo especifico
+// Se usa para ver informacion detallada de un modelo (tamano, tipo, ruta)
+export async function getModelDetail(modelName) {
+  return withFallback(
+    async () => {
+      const { data } = await api.get(`/models/${encodeURIComponent(modelName)}`)
+      return data
+    },
+    async () => {
+      await delay(300)
+      const mockModel = MOCK_MODELS.models.find(m => m.name === modelName)
+      return mockModel || { name: modelName, size: 0, type: 'yolo', path: `models/local/${modelName}` }
+    }
+  )
+}
+
 // --- Detecciones ---
 
 // POST /api/detections - Envia una imagen para procesar
@@ -134,9 +150,11 @@ export async function getFrameThumbnail(frameId) {
 }
 
 // GET /api/frames/search - Busca fotogramas con filtros
+// Soporta filtros por clases, ubicacion (lat/lon), camera_id, source,
+// mas parametros de paginacion (limit/offset)
 // Solo envia parametros con valor para evitar que FastAPI reciba strings
 // vacios que fallarian al parsear como float (ver Tarea 0.4)
-export async function searchFrames({ clases, lat_min, lat_max, lon_min, lon_max, limit, offset } = {}) {
+export async function searchFrames({ clases, lat_min, lat_max, lon_min, lon_max, camera_id, source, limit, offset } = {}) {
   return withFallback(
     async () => {
       const params = {}
@@ -145,6 +163,8 @@ export async function searchFrames({ clases, lat_min, lat_max, lon_min, lon_max,
       if (lat_max !== undefined && lat_max !== '') params.lat_max = lat_max
       if (lon_min !== undefined && lon_min !== '') params.lon_min = lon_min
       if (lon_max !== undefined && lon_max !== '') params.lon_max = lon_max
+      if (camera_id) params.camera_id = camera_id
+      if (source) params.source = source
       if (limit !== undefined) params.limit = limit
       if (offset !== undefined) params.offset = offset
       const { data } = await api.get('/frames/search', { params })
@@ -175,12 +195,64 @@ export async function searchFrames({ clases, lat_min, lat_max, lon_min, lon_max,
       if (lon_max !== undefined && lon_max !== '') {
         frames = frames.filter(f => f.longitude <= parseFloat(lon_max))
       }
+      if (camera_id) {
+        frames = frames.filter(f => f.metadata?.camera_id === camera_id)
+      }
+      if (source) {
+        frames = frames.filter(f => f.metadata?.source === source)
+      }
       return { total: frames.length, frames }
     }
   )
 }
 
 // --- Personas ---
+
+// GET /api/persons/{personId} - Obtiene detalle de una persona por su ID
+// Se usa en la vista de detalle de persona
+export async function getPerson(personId) {
+  return withFallback(
+    async () => {
+      const { data } = await api.get(`/persons/${personId}`)
+      return data
+    },
+    async () => {
+      await delay(300)
+      const mockPerson = MOCK_PERSONS.persons.find(p => p.person_id === personId)
+      return mockPerson || { person_id: personId, nombre: 'N/A', apellido: '', email: '', created_at: '', updated_at: '' }
+    }
+  )
+}
+
+// PUT /api/persons/{personId} - Actualiza los datos de una persona
+// Retorna la persona actualizada
+export async function updatePerson(personId, personData) {
+  return withFallback(
+    async () => {
+      const { data } = await api.put(`/persons/${personId}`, personData)
+      return data
+    },
+    async () => {
+      await delay(500)
+      return { person_id: personId, ...personData, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    }
+  )
+}
+
+// DELETE /api/persons/{personId} - Elimina una persona
+// Retorna true si se elimino correctamente
+export async function deletePerson(personId) {
+  return withFallback(
+    async () => {
+      await api.delete(`/persons/${personId}`)
+      return true
+    },
+    async () => {
+      await delay(400)
+      return true
+    }
+  )
+}
 
 // GET /api/persons - Lista personas registradas
 export async function getPersons() {
@@ -251,6 +323,18 @@ export async function recognizeFace({ image_base64, threshold }) {
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Construye la URL para obtener la imagen de un frame desde el backend.
+// Si thumbnail=true, el backend redimensiona la imagen a 300px.
+// Esto es necesario porque el thumbnail solo funciona a traves del endpoint
+// de la API (GET /api/frames/{frameId}?thumbnail=true), no desde SeaweedFS directo.
+export function getFrameImageUrl(frameId, thumbnail = false) {
+  const baseURL = isLocalDev
+    ? 'http://localhost:8000/api/'
+    : 'https://bfts2026.mooo.com/api/'
+  const url = `${baseURL}frames/${frameId}`
+  return thumbnail ? `${url}?thumbnail=true` : url
 }
 
 // Convierte un File (imagen) a base64 (sin prefijo data:image/...)

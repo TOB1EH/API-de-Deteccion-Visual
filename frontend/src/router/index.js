@@ -37,6 +37,16 @@ const routes = [
     component: () => import('../views/PersonsView.vue')
   },
   {
+    path: '/persona/:id',
+    name: 'PersonDetail',
+    component: () => import('../views/PersonDetailView.vue')
+  },
+  {
+    path: '/modelo/:name',
+    name: 'ModelDetail',
+    component: () => import('../views/ModelDetailView.vue')
+  },
+  {
     path: '/facial',
     name: 'Facial',
     component: () => import('../views/FaceRecognitionView.vue')

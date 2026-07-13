@@ -53,11 +53,25 @@ docker start <nombre_del_contenedor>
 
 ## 6. Iniciar frontend (Vite dev server)
 
+Cuando el stack Docker esta arriba, el contenedor `api_detection_frontend_local` ya esta usando el puerto 3000. Para desarrollar con Vite (hot reload) necesitas liberar ese puerto primero:
+
 ```bash
+# Detener el frontend de Docker para liberar el puerto 3000
+docker stop api_detection_frontend_local
+
+# Iniciar Vite dev server (toma el puerto 3000 automaticamente)
 cd frontend && npm run dev
 ```
 
-Abre `http://localhost:3000` en el navegador.
+Si Vite muestra `Port 3000 is in use, trying another one...`, significa que el contenedor Docker del frontend o Grafana (puerto 3001) siguen ocupando esos puertos. Verifica con:
+
+```bash
+lsof -i :3000
+```
+
+Y detene el proceso o contenedor que lo este usando.
+
+Abre `http://localhost:3000` en el navegador. Si Vite asigno otro puerto (ej. 3002), Keycloak rechazara el login porque sus redirect URIs estan configurados para `localhost:3000`. Siempre asegurate de que Vite use el puerto 3000.
 
 ## 7. Probar login con Keycloak
 
@@ -103,6 +117,10 @@ python3 client/setup_cliente.py infer ruta/imagen.jpg --model pelotas.pt
 | Problema | Solucion |
 |---|---|
 | `frontend:80` host not found en nginx | Ignorar si usas Vite dev server. El contenedor `frontend` conflictua con el puerto 3000 del Vite. |
+| Vite asigna puerto 3002 en vez de 3000 | El contenedor `api_detection_frontend_local` o Grafana estan usando el 3000/3001. Ejecuta `docker stop api_detection_frontend_local` primero. |
+| Keycloak redirige a `localhost:3000` pero Vite esta en otro puerto | Los redirect URIs de Keycloak solo aceptan `localhost:3000`. Detene el frontend de Docker (`docker stop api_detection_frontend_local`) y reinicia Vite. |
+| Login de Keycloak no completa (timeout en 3rd-party check iframe) | Agregar `checkLoginIframe: false` en `authService.init()` de `frontend/src/services/auth.js`. Es un bug conocido de keycloak-js en localhost. |
+| Keycloak aparece `(unhealthy)` en `docker ps` | Falso positivo. El health check usa `curl` que la imagen de Keycloak no tiene disponible, pero el servicio funciona. Ignorar si responde en `http://localhost:8081/auth/realms/api-detection`. |
 | Keycloak no termina de iniciar (`health: starting`) | Esperar 1-2 min. Si persiste, reiniciar: `docker restart api_detection_keycloak_local` |
 | API devuelve 401 | No estas usando modo demo. Logeate via Keycloak primero. |
 | `docker compose up -d` falla por puerto en uso | `docker rm -f <contenedor>` y reintentar. |

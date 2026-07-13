@@ -190,7 +190,8 @@
               v-for="model in models"
               :key="model.name"
               class="d-flex align-center pa-3 mb-2"
-              style="border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 8px;"
+              style="border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 8px; cursor: pointer;"
+              @click="goToModel(model.name)"
             >
               <v-icon color="cyan-accent-3" class="mr-3" size="28">mdi-file-document-outline</v-icon>
               <div class="flex-grow-1">
@@ -251,6 +252,10 @@ function formatSize(bytes) {
 
 function goToFrame(frameId) {
   router.push(`/frame/${frameId}`)
+}
+
+function goToModel(modelName) {
+  router.push(`/modelo/${encodeURIComponent(modelName)}`)
 }
 
 onMounted(async () => {

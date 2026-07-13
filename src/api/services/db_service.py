@@ -390,6 +390,69 @@ class DatabaseService:
             logger.error("Error obteniendo detecciones: %s", e)
             return []
 
+    def update_person(self, person_id: str, name: str, email: str = None,
+                      metadata: dict = None) -> bool:
+        """
+        Actualiza los datos de una persona existente en la base de datos.
+
+        Args:
+            person_id: ID de la persona a actualizar
+            name: Nombre completo actualizado
+            email: Email actualizado
+            metadata: Metadatos adicionales actualizados
+
+        Returns:
+            True si se actualizo correctamente, False en caso contrario
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            query = """
+            UPDATE persons
+            SET name = %s, email = %s, metadata = %s, updated_at = NOW()
+            WHERE person_id = %s
+            """
+            cursor.execute(query, (name, email,
+                                   json.dumps(metadata) if metadata else None,
+                                   person_id))
+            conn.commit()
+            success = cursor.rowcount > 0
+            cursor.close()
+            conn.close()
+            return success
+        except Exception as e:
+            logger.error("Error actualizando persona: %s", e)
+            return False
+
+    def delete_person(self, person_id: str) -> bool:
+        """
+        Elimina una persona y sus embeddings asociados de la base de datos.
+
+        Primero elimina los embeddings (tabla face_embeddings) para mantener
+        la integridad referencial, luego elimina el registro de la persona.
+
+        Args:
+            person_id: ID de la persona a eliminar
+
+        Returns:
+            True si se elimino correctamente, False en caso contrario
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            # Eliminar primero los embeddings asociados a la persona
+            cursor.execute("DELETE FROM face_embeddings WHERE person_id = %s", (person_id,))
+            # Luego eliminar la persona
+            cursor.execute("DELETE FROM persons WHERE person_id = %s", (person_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+            cursor.close()
+            conn.close()
+            return success
+        except Exception as e:
+            logger.error("Error eliminando persona: %s", e)
+            return False
+
     def create_person(self, person_id: str, name: str, email: str = None,
                       metadata: dict = None) -> bool:
         try:

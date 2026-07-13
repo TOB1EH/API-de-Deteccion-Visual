@@ -24,7 +24,7 @@
                 <v-chip v-if="hasActiveFilters" size="x-small" color="primary">activos</v-chip>
               </div>
             </v-expansion-panel-title>
-            <v-expansion-panel-text>
+                <v-expansion-panel-text>
               <v-row>
                 <v-col cols="12" md="6" lg="4">
                   <v-text-field
@@ -71,6 +71,26 @@
                     type="number"
                     placeholder="-58.3"
                     prepend-inner-icon="mdi-arrow-right-bold"
+                  />
+                </v-col>
+                <v-col cols="6" md="3" lg="2">
+                  <v-text-field
+                    v-model="filters.camera_id"
+                    label="Camara ID"
+                    placeholder="cam-001"
+                    clearable
+                    prepend-inner-icon="mdi-cctv"
+                  />
+                </v-col>
+                <v-col cols="6" md="3" lg="2">
+                  <v-select
+                    v-model="filters.source"
+                    label="Fuente"
+                    :items="['', 'web', 'camara', 'mobile', 'upload']"
+                    clearable
+                    prepend-inner-icon="mdi-source-branch"
+                    hint="Origen de la imagen"
+                    persistent-hint
                   />
                 </v-col>
               </v-row>
@@ -196,11 +216,13 @@ const filters = reactive({
   lat_min: '',
   lat_max: '',
   lon_min: '',
-  lon_max: ''
+  lon_max: '',
+  camera_id: '',
+  source: ''
 })
 
 const hasActiveFilters = computed(() =>
-  filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max
+  filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max || filters.camera_id || filters.source
 )
 
 function resetFilters() {
@@ -209,6 +231,8 @@ function resetFilters() {
   filters.lat_max = ''
   filters.lon_min = ''
   filters.lon_max = ''
+  filters.camera_id = ''
+  filters.source = ''
   searched.value = false
   filteredFrames.value = []
 }
@@ -224,7 +248,9 @@ async function doSearch() {
       lat_min: filters.lat_min,
       lat_max: filters.lat_max,
       lon_min: filters.lon_min,
-      lon_max: filters.lon_max
+      lon_max: filters.lon_max,
+      camera_id: filters.camera_id || undefined,
+      source: filters.source || undefined
     })
     filteredFrames.value = data.frames || []
   } catch (err) {

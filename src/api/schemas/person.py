@@ -20,6 +20,13 @@ class PersonResponse(BaseModel):
     updated_at: str
 
 
+class PersonUpdate(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=255)
+    apellido: str = Field(..., min_length=1, max_length=255)
+    email: Optional[str] = Field(None, max_length=255)
+    metadata: Optional[dict[str, Any]] = None
+
+
 class PersonListResponse(BaseModel):
     total: int
     persons: list[PersonResponse]

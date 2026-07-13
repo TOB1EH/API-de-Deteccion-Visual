@@ -87,15 +87,47 @@
               ID: {{ selectedPerson.person_id }}
             </div>
           </div>
-          <v-btn
-            color="primary"
-            class="text-none"
-            elevation="3"
-            @click="triggerFacesUpload"
-          >
-            <v-icon start>mdi-camera-plus</v-icon>
-            Subir fotos faciales
-          </v-btn>
+          <div class="d-flex ga-2">
+            <!-- Boton para ver detalle completo de la persona -->
+            <v-btn
+              variant="tonal"
+              class="text-none"
+              @click="goToPersonDetail(selectedPerson.person_id)"
+            >
+              <v-icon start>mdi-account-details</v-icon>
+              Ver detalle
+            </v-btn>
+            <!-- Boton para editar datos de la persona -->
+            <v-btn
+              color="warning"
+              variant="tonal"
+              class="text-none"
+              @click="openEditDialog(selectedPerson)"
+            >
+              <v-icon start>mdi-pencil</v-icon>
+              Editar
+            </v-btn>
+            <!-- Boton para eliminar persona con confirmacion -->
+            <v-btn
+              color="error"
+              variant="tonal"
+              class="text-none"
+              @click="confirmDelete(selectedPerson)"
+            >
+              <v-icon start>mdi-delete</v-icon>
+              Eliminar
+            </v-btn>
+            <!-- Boton para subir fotos faciales -->
+            <v-btn
+              color="primary"
+              class="text-none"
+              elevation="3"
+              @click="triggerFacesUpload"
+            >
+              <v-icon start>mdi-camera-plus</v-icon>
+              Subir fotos faciales
+            </v-btn>
+          </div>
           <input
             ref="facesInput"
             type="file"
@@ -125,37 +157,72 @@
     </v-col>
   </v-row>
 
+  <!-- Dialogo para crear o editar persona -->
+  <!-- Se reutiliza PersonForm; si editingPerson tiene datos, se pre-rellena el formulario -->
   <v-dialog v-model="dialog" max-width="480" transition="dialog-top-transition">
     <v-card class="pa-5">
       <div class="d-flex align-center mb-4">
         <v-avatar color="primary" variant="tonal" size="36" class="mr-3">
-          <v-icon>mdi-account-plus</v-icon>
+          <v-icon>{{ editingPerson ? 'mdi-pencil' : 'mdi-account-plus' }}</v-icon>
         </v-avatar>
         <div>
-          <div class="text-h6 font-weight-bold">Nueva persona</div>
-          <div class="text-caption text-medium-emphasis">Completa los datos para registrar una persona</div>
+          <div class="text-h6 font-weight-bold">{{ editingPerson ? 'Editar persona' : 'Nueva persona' }}</div>
+          <div class="text-caption text-medium-emphasis">{{ editingPerson ? 'Modifica los datos de la persona' : 'Completa los datos para registrar una persona' }}</div>
         </div>
         <v-spacer />
         <v-btn icon="mdi-close" variant="text" size="small" @click="dialog = false" />
       </div>
-      <PersonForm @submit="savePerson" @cancel="dialog = false" />
+      <!-- PersonForm recibe la persona a editar via prop; si es null, crea una nueva -->
+      <PersonForm :person="editingPerson" @submit="editingPerson ? updatePersonData(editingPerson.person_id, $event) : savePerson($event)" @cancel="dialog = false" />
+    </v-card>
+  </v-dialog>
+
+  <!-- Dialogo de confirmacion para eliminar persona -->
+  <v-dialog v-model="deleteDialog" max-width="400" transition="dialog-top-transition">
+    <v-card class="pa-5">
+      <div class="text-center mb-4">
+        <v-avatar color="error" size="56" class="mb-3">
+          <v-icon size="28" color="white">mdi-alert</v-icon>
+        </v-avatar>
+        <div class="text-h6 font-weight-bold">Eliminar persona</div>
+        <p class="text-body-2 text-medium-emphasis mt-2">
+          ¿Estas seguro de eliminar a <strong>{{ deletingPerson?.nombre }} {{ deletingPerson?.apellido }}</strong>?
+          <br>Se eliminaran tambien todos sus embeddings faciales asociados.
+        </p>
+      </div>
+      <div class="d-flex ga-2 justify-end">
+        <v-btn variant="tonal" @click="deleteDialog = false" class="text-none">Cancelar</v-btn>
+        <v-btn color="error" @click="doDelete" :loading="deleting" class="text-none">
+          <v-icon start>mdi-delete</v-icon>
+          Eliminar
+        </v-btn>
+      </div>
     </v-card>
   </v-dialog>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getPersons, createPerson, postFaceEmbed, fileToBase64 } from '../services/api'
+import { useRouter } from 'vue-router'
+import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64 } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
+
+const router = useRouter()
 
 const search = ref('')
 const persons = ref([])
 const dialog = ref(false)
+const editingPerson = ref(null)
 const selectedPerson = ref(null)
 const facesInput = ref(null)
 const uploading = ref(false)
 const uploadMsg = ref('')
 const uploadError = ref(false)
+
+// Estado del dialogo de eliminacion
+const deleteDialog = ref(false)
+const deletingPerson = ref(null)
+const deleting = ref(false)
 
 const filteredPersons = computed(() => {
   if (!search.value) return persons.value
@@ -167,6 +234,58 @@ const filteredPersons = computed(() => {
   )
 })
 
+// Abre el dialogo de edicion con los datos de la persona seleccionada
+function openEditDialog(person) {
+  editingPerson.value = { ...person }
+  dialog.value = true
+}
+
+// Muestra el dialogo de confirmacion para eliminar una persona
+function confirmDelete(person) {
+  deletingPerson.value = person
+  deleteDialog.value = true
+}
+
+// Actualiza los datos de una persona via API y refresca la lista
+async function updatePersonData(personId, personData) {
+  try {
+    const updated = await updatePerson(personId, personData)
+    const idx = persons.value.findIndex(p => p.person_id === personId)
+    if (idx !== -1) {
+      persons.value[idx] = updated
+    }
+    dialog.value = false
+    editingPerson.value = null
+    selectedPerson.value = updated
+  } catch (err) {
+    console.error('Error al actualizar persona:', err)
+  }
+}
+
+// Ejecuta la eliminacion de la persona confirmada
+async function doDelete() {
+  if (!deletingPerson.value) return
+  deleting.value = true
+  try {
+    await deletePerson(deletingPerson.value.person_id)
+    persons.value = persons.value.filter(p => p.person_id !== deletingPerson.value.person_id)
+    if (selectedPerson.value?.person_id === deletingPerson.value.person_id) {
+      selectedPerson.value = null
+    }
+    deleteDialog.value = false
+    deletingPerson.value = null
+  } catch (err) {
+    console.error('Error al eliminar persona:', err)
+  } finally {
+    deleting.value = false
+  }
+}
+
+// Navega a la vista de detalle completo de la persona
+function goToPersonDetail(personId) {
+  router.push(`/persona/${personId}`)
+}
+
 onMounted(async () => {
   try {
     const data = await getPersons()
@@ -177,6 +296,9 @@ onMounted(async () => {
 })
 
 function openNewDialog() {
+  // Al crear una persona nueva, editingPerson debe ser null para que el
+  // formulario se muestre vacio y el submit cree un registro nuevo
+  editingPerson.value = null
   dialog.value = true
 }
 

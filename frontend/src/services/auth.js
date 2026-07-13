@@ -45,7 +45,11 @@ export const authService = {
       }
       authState.loading = true
       const authenticated = await keycloak.init({
-        onLoad: 'check-sso'
+        onLoad: 'check-sso',
+        // Desactiva el iframe de verificacion de 3rd-party cookies porque
+        // Keycloak 26.x en localhost causa timeout. El login funciona igual
+        // procesando el callback OAuth directamente desde la URL.
+        checkLoginIframe: false
       })
       console.log('[Keycloak] init result - authenticated:', authenticated)
       if (authenticated) {

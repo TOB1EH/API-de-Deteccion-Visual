@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from uuid import uuid4
 from datetime import datetime, timezone
-from ..schemas.person import PersonCreate, PersonResponse, PersonListResponse
+from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,111 @@ async def create_person(request: PersonCreate):
         raise
     except Exception as e:
         logger.exception("Error creando persona")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
+
+@router.put("/{person_id}", response_model=PersonResponse)
+async def update_person(person_id: str, request: PersonUpdate):
+    """
+    Actualiza los datos de una persona existente.
+
+    PUT /api/persons/{person_id}
+
+    Args:
+        person_id: ID de la persona a actualizar
+        request: Datos actualizados (nombre, apellido, email, metadata)
+
+    Retorna:
+        PersonResponse con los datos actualizados
+        404 si la persona no existe
+        500 si hay error de base de datos
+    """
+    try:
+        # Verificar que la persona existe
+        existing = db_service.get_person(person_id)
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Persona {person_id} no encontrada"
+            )
+
+        name = f"{request.nombre} {request.apellido}"
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+        updated = db_service.update_person(
+            person_id=person_id,
+            name=name,
+            email=request.email,
+            metadata=request.metadata
+        )
+
+        if not updated:
+            raise HTTPException(
+                status_code=500,
+                detail="Error al actualizar la persona en la base de datos"
+            )
+
+        return PersonResponse(
+            person_id=person_id,
+            nombre=request.nombre,
+            apellido=request.apellido,
+            email=request.email,
+            metadata=request.metadata or {},
+            created_at=existing["created_at"],
+            updated_at=timestamp
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error actualizando persona")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
+
+
+@router.delete("/{person_id}", status_code=204)
+async def delete_person(person_id: str):
+    """
+    Elimina una persona y sus embeddings asociados.
+
+    DELETE /api/persons/{person_id}
+
+    Args:
+        person_id: ID de la persona a eliminar
+
+    Retorna:
+        204 No Content si se elimino correctamente
+        404 si la persona no existe
+        500 si hay error de base de datos
+    """
+    try:
+        # Verificar que la persona existe
+        existing = db_service.get_person(person_id)
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Persona {person_id} no encontrada"
+            )
+
+        deleted = db_service.delete_person(person_id)
+
+        if not deleted:
+            raise HTTPException(
+                status_code=500,
+                detail="Error al eliminar la persona de la base de datos"
+            )
+
+        return None
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error eliminando persona")
         raise HTTPException(
             status_code=500,
             detail=f"Error interno: {str(e)}"
