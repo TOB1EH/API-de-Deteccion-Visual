@@ -187,6 +187,8 @@
 
           <div v-if="models.length > 0">
             <div
+              <!-- Las cards de modelos ahora son clickeables (cursor: pointer)
+                   y al hacer click navegan a ModelDetailView para ver detalle. -->
               v-for="model in models"
               :key="model.name"
               class="d-flex align-center pa-3 mb-2"
@@ -254,6 +256,9 @@ function goToFrame(frameId) {
   router.push(`/frame/${frameId}`)
 }
 
+// Navega al detalle del modelo seleccionado.
+// Los modelos ahora son clickeables: al hacer click se abre la vista
+// ModelDetailView con informacion detallada (tamano, tipo, ruta).
 function goToModel(modelName) {
   router.push(`/modelo/${encodeURIComponent(modelName)}`)
 }

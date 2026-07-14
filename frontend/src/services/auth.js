@@ -1,4 +1,8 @@
-// Servicio central de autenticacion con Keycloak (keycloak-js)
+// Servicio central de autenticacion con Keycloak (keycloak-js).
+// Gestiona el estado de autenticacion global (authState), login OAuth2 con
+// Keycloak, modo demo local y extraccion de roles/permisos desde el token JWT.
+// El estado es reactivo (vue reactive) para que toda la app se entere cuando
+// cambia la sesion. El init se ejecuta antes de montar la app (ver main.js).
 
 import Keycloak from 'keycloak-js'
 import { reactive } from 'vue'

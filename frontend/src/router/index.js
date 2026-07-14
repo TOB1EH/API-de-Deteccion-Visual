@@ -36,11 +36,17 @@ const routes = [
     name: 'Personas',
     component: () => import('../views/PersonsView.vue')
   },
+  // Ruta /persona/:id - Muestra el detalle completo de una persona
+  // (nombre, email, metadatos, fechas). Accesible desde PersonasView
+  // haciendo click en "Ver detalle" sobre una persona seleccionada.
   {
     path: '/persona/:id',
     name: 'PersonDetail',
     component: () => import('../views/PersonDetailView.vue')
   },
+  // Ruta /modelo/:name - Muestra informacion detallada de un modelo
+  // (tamano, tipo, ruta del archivo). Accesible desde HomeView haciendo
+  // click en cualquier modelo de la lista "Modelos Activos".
   {
     path: '/modelo/:name',
     name: 'ModelDetail',

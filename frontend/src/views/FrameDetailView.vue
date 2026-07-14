@@ -160,6 +160,11 @@
 </template>
 
 <script setup>
+// FrameDetailView - Vista de detalle de un fotograma procesado.
+// Muestra la imagen con overlay de bounding boxes (DetectionOverlay),
+// metadatos del frame (ID, modelo, ubicacion, fecha) y tabla de detecciones.
+// Incluye funcionalidades agregadas: toggle original/miniatura (thumbnail)
+// y descarga de imagen en ambas resoluciones.
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getFrame, getFrameImageUrl } from '../services/api'

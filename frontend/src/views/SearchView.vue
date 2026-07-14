@@ -73,6 +73,9 @@
                     prepend-inner-icon="mdi-arrow-right-bold"
                   />
                 </v-col>
+                <!-- Filtro por ID de camara (camera_id): permite buscar fotogramas
+                     capturados por una camara especifica (ej: cam-001, cam-002).
+                     El backend filtra por coincidencia exacta. -->
                 <v-col cols="6" md="3" lg="2">
                   <v-text-field
                     v-model="filters.camera_id"
@@ -82,6 +85,9 @@
                     prepend-inner-icon="mdi-cctv"
                   />
                 </v-col>
+                <!-- Filtro por fuente de origen (source): permite buscar fotogramas
+                     segun su procedencia (web, camara, mobile, upload).
+                     Usa un v-select con opciones predefinidas. -->
                 <v-col cols="6" md="3" lg="2">
                   <v-select
                     v-model="filters.source"
@@ -189,6 +195,11 @@
 </template>
 
 <script setup>
+// SearchView - Vista de busqueda de fotogramas con filtros.
+// Permite buscar por clases detectadas, rango de coordenadas (lat/lon),
+// ID de camara (camera_id) y fuente de origen (source).
+// Los filtros camera_id y source se agregaron para aprovechar el soporte
+// que ya tenia el backend en GET /api/frames/search.
 import { ref, reactive, computed } from 'vue'
 import { searchFrames } from '../services/api'
 import FrameCard from '../components/FrameCard.vue'
@@ -211,6 +222,11 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(filteredFrames.value.length / itemsPerPage.value))
 )
 
+// Objeto reactivo con todos los filtros de busqueda.
+// Los campos camera_id y source se agregaron para permitir filtrar
+// por camara especifica y fuente de origen respectivamente.
+// El backend (GET /api/frames/search) ya soportaba estos parametros
+// pero el frontend no los exponia en el formulario.
 const filters = reactive({
   clases: '',
   lat_min: '',
@@ -221,6 +237,8 @@ const filters = reactive({
   source: ''
 })
 
+// Detecta si hay algun filtro activo para mostrar el chip "activos".
+// Incluye los nuevos filtros camera_id y source ademas de los clasicos.
 const hasActiveFilters = computed(() =>
   filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max || filters.camera_id || filters.source
 )
@@ -237,6 +255,9 @@ function resetFilters() {
   filteredFrames.value = []
 }
 
+// Ejecuta la busqueda contra el backend con todos los filtros activos.
+// Incluye los nuevos filtros camera_id y source en los parametros enviados.
+// El mock de api.js ya filtra localmente estos campos si la API no responde.
 async function doSearch() {
   searched.value = true
   loading.value = true
