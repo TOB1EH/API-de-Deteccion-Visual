@@ -13,7 +13,7 @@ import {
   MOCK_RECOGNITION,
   MOCK_RECOGNITION_FAIL
 } from './mock'
-import { authState } from './auth'
+import { authState, showAuthError } from './auth'
 
 // En local (npm run dev) apunta a la API local en puerto 8000
 // En produccion apunta al servidor remoto via Nginx
@@ -35,13 +35,18 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Interceptor de response: si da 401, redirige al login SOLO en produccion
+// Interceptor de response: redirige al login en 401 (token expirado/invalido)
+// y muestra alerta en 403 (permisos insuficientes). Solo en produccion.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !authState.isDemoMode && !isLocalDev) {
-      if (window.location.pathname !== '/login') {
+    if (!authState.isDemoMode && !isLocalDev) {
+      if (error.response?.status === 401 && window.location.pathname !== '/login') {
         window.location.href = '/login'
+      }
+      if (error.response?.status === 403) {
+        console.warn('[API] Acceso denegado (403):', error.config?.url)
+        showAuthError('No tenes permisos para realizar esta accion.')
       }
     }
     return Promise.reject(error)

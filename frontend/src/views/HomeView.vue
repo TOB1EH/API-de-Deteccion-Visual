@@ -187,8 +187,6 @@
 
           <div v-if="models.length > 0">
             <div
-              <!-- Las cards de modelos ahora son clickeables (cursor: pointer)
-                   y al hacer click navegan a ModelDetailView para ver detalle. -->
               v-for="model in models"
               :key="model.name"
               class="d-flex align-center pa-3 mb-2"
@@ -210,9 +208,13 @@
             </div>
           </div>
 
-          <div v-else class="text-center pa-4">
+          <div v-else-if="!modelsLoaded" class="text-center pa-4">
             <v-progress-circular indeterminate color="cyan-accent-3" size="32" />
             <p class="text-caption text-grey mt-2">Cargando modelos...</p>
+          </div>
+          <div v-else class="text-center pa-4">
+            <v-icon size="36" color="grey-darken-1" class="mb-2">mdi-file-remove</v-icon>
+            <p class="text-caption text-grey">No hay modelos disponibles</p>
           </div>
         </v-card>
       </v-col>
@@ -236,6 +238,7 @@ const kpis = ref([
 
 const recentFrames = ref([])
 const models = ref([])
+const modelsLoaded = ref(false)
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -264,31 +267,38 @@ function goToModel(modelName) {
 }
 
 onMounted(async () => {
-  try {
-    const [modelsData, personsData, framesData] = await Promise.all([
-      getModels(),
-      getPersons(),
-      searchFrames({ limit: 6 })
-    ])
+  // Cada llamada se maneja por separado para que el error de una no
+  // bloquee las otras. Los servicios tienen fallback a mock interno,
+  // pero si el token no tiene permisos (403) igualmente se usa mock.
+  const [modelsData, personsData, framesData] = await Promise.allSettled([
+    getModels(),
+    getPersons(),
+    searchFrames({ limit: 6 })
+  ])
 
-    if (modelsData?.models) {
-      models.value = modelsData.models
-      kpis.value[3].value = String(modelsData.total || modelsData.models.length)
-    }
+  if (modelsData.status === 'fulfilled' && modelsData.value?.models) {
+    models.value = modelsData.value.models
+    kpis.value[3].value = String(modelsData.value.total || modelsData.value.models.length)
+  } else {
+    console.warn('[HomeView] Error cargando modelos:', modelsData.reason)
+    // Si fallo la carga, mostrar "No hay modelos disponibles"
+  }
+  modelsLoaded.value = true
 
-    if (personsData?.persons) {
-      kpis.value[2].value = String(personsData.total || personsData.persons.length)
-    }
+  if (personsData.status === 'fulfilled' && personsData.value?.persons) {
+    kpis.value[2].value = String(personsData.value.total || personsData.value.persons.length)
+  } else {
+    console.warn('[HomeView] Error cargando personas:', personsData.reason)
+  }
 
-    if (framesData?.frames) {
-      recentFrames.value = framesData.frames.slice(0, 6)
-      kpis.value[0].value = String(framesData.total || framesData.frames.length)
+  if (framesData.status === 'fulfilled' && framesData.value?.frames) {
+    recentFrames.value = framesData.value.frames.slice(0, 6)
+    kpis.value[0].value = String(framesData.value.total || framesData.value.frames.length)
 
-      const totalDetections = framesData.frames.reduce((sum, f) => sum + (f.detections_count || 0), 0)
-      kpis.value[1].value = String(totalDetections)
-    }
-  } catch (err) {
-    console.error('[HomeView] Error cargando datos:', err)
+    const totalDetections = framesData.value.frames.reduce((sum, f) => sum + (f.detections_count || 0), 0)
+    kpis.value[1].value = String(totalDetections)
+  } else {
+    console.warn('[HomeView] Error cargando frames:', framesData.reason)
   }
 })
 </script>

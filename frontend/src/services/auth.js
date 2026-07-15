@@ -16,6 +16,58 @@ export const authState = reactive({
   loading: true
 })
 
+// Estado global para mostrar alertas de error (ej: 403, permisos insuficientes)
+export const authError = reactive({
+  message: '',
+  show: false,
+})
+
+// Muestra una alerta de error de autenticacion/autorizacion al usuario.
+// Se conecta con el interceptor 403 de api.js y con App.vue para mostrar un snackbar.
+export function showAuthError(msg) {
+  authError.message = msg
+  authError.show = true
+  // Oculta automaticamente despues de 5 segundos
+  setTimeout(() => {
+    authError.show = false
+    authError.message = ''
+  }, 5000)
+}
+
+// ===== FUNCIONES AYUDANTES PARA VERIFICAR ROLES =====
+// Los roles se extraen del token JWT de Keycloak (realm_access.roles).
+// En modo demo, se asume operador para poder probar las funcionalidades basicas.
+
+// Verifica si el usuario autenticado tiene el rol especificado.
+// Retorna true si el usuario es admin, operator, o tiene el rol exacto.
+export function hasRole(role) {
+  // En modo demo, devolvemos true para roles no restrictivos
+  if (authState.isDemoMode) return true
+  if (!authState.authenticated || !authState.user) return false
+  const roles = authState.user.roles || []
+  return roles.includes(role)
+}
+
+// Verifica si el usuario tiene ALGUNO de los roles de la lista.
+export function hasAnyRole(roles) {
+  // En modo demo, devolvemos true
+  if (authState.isDemoMode) return true
+  if (!authState.authenticated || !authState.user) return false
+  const userRoles = authState.user.roles || []
+  return roles.some(role => userRoles.includes(role))
+}
+
+// Verifica si el usuario es admin (tiene el rol 'admin').
+export function isAdmin() {
+  return hasRole('admin')
+}
+
+// Verifica si el usuario puede escribir/editar datos en el sistema:
+// admin siempre puede, operator puede escribir cierto tipo de datos.
+export function canWrite() {
+  return hasAnyRole(['admin', 'operator'])
+}
+
 const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
 // En local usa proxy de Vite (mismo origen, sin CORS en token exchange)

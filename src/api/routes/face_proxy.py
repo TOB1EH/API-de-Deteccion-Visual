@@ -6,7 +6,7 @@ from uuid import uuid4
 from typing import Optional
 from io import BytesIO
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from psycopg2.extras import RealDictCursor
 
 
@@ -21,6 +21,7 @@ from ..schemas.face import (
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 from ..services.db_service import DatabaseService
+from ..services.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,8 @@ router = APIRouter(
 )
 
 
-@router.post("/persons/{person_id}/face-embed", response_model=FaceEmbedUploadResponse, status_code=201)
+@router.post("/persons/{person_id}/face-embed", response_model=FaceEmbedUploadResponse, status_code=201,
+             dependencies=[Depends(require_role(["admin"]))])
 async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedUploadRequest):
     """
     Orquestador de embedding facial: recibe la imagen, la envia al inference-server
@@ -93,7 +95,8 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
     )
 
 
-@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201)
+@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201,
+             dependencies=[Depends(require_role(["admin"]))])
 async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
     try:
         conn = db_service.get_connection()
@@ -143,7 +146,8 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
-@router.post("/face-recognition", response_model=FaceRecognizeResponse)
+@router.post("/face-recognition", response_model=FaceRecognizeResponse,
+             dependencies=[Depends(require_role(["admin"]))])
 async def recognize_face(request: FaceRecognizeRequest):
     try:
         conn = db_service.get_connection()

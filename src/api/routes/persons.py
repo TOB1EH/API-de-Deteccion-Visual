@@ -1,9 +1,10 @@
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from uuid import uuid4
 from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
+from ..services.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=PersonResponse, status_code=201)
+@router.post("", response_model=PersonResponse, status_code=201,
+             dependencies=[Depends(require_role(["admin"]))])
 async def create_person(request: PersonCreate):
     try:
         person_id = str(uuid4())
@@ -54,7 +56,8 @@ async def create_person(request: PersonCreate):
         )
 
 
-@router.put("/{person_id}", response_model=PersonResponse)
+@router.put("/{person_id}", response_model=PersonResponse,
+            dependencies=[Depends(require_role(["admin"]))])
 async def update_person(person_id: str, request: PersonUpdate):
     """
     Actualiza los datos de una persona existente.
@@ -115,7 +118,8 @@ async def update_person(person_id: str, request: PersonUpdate):
         )
 
 
-@router.delete("/{person_id}", status_code=204)
+@router.delete("/{person_id}", status_code=204,
+               dependencies=[Depends(require_role(["admin"]))])
 async def delete_person(person_id: str):
     """
     Elimina una persona y sus embeddings asociados.
@@ -159,7 +163,8 @@ async def delete_person(person_id: str):
         )
 
 
-@router.get("/{person_id}", response_model=PersonResponse)
+@router.get("/{person_id}", response_model=PersonResponse,
+            dependencies=[Depends(require_role(["admin", "operator"]))])
 async def get_person(person_id: str):
     try:
         person = db_service.get_person(person_id)
@@ -179,7 +184,8 @@ async def get_person(person_id: str):
         )
 
 
-@router.get("", response_model=PersonListResponse)
+@router.get("", response_model=PersonListResponse,
+            dependencies=[Depends(require_role(["admin", "operator"]))])
 async def list_persons():
     try:
         persons = db_service.list_persons()

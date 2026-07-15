@@ -141,3 +141,42 @@ def verify_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token invalido: {str(e)}",
         )
+
+
+def require_role(roles: list[str]):
+    """
+    Dependencia de FastAPI que verifica que el token autenticado tenga al menos
+    uno de los roles especificados. Se usa como dependencia adicional en rutas
+    que requieren permisos especificos.
+
+    Uso:
+        @router.post("/api/detections", dependencies=[Depends(require_role(["admin", "operator"]))])
+        async def create_detection(...):
+            ...
+
+    Args:
+        roles: Lista de roles permitidos (ej: ["admin"], ["admin", "operator"])
+
+    Retorna:
+        dict con los datos del token si el rol es valido
+
+    Lanza:
+        403 Forbidden si el token no tiene ningun rol requerido
+    """
+    def _role_checker(auth_data: dict = Depends(verify_token)):
+        # Extraer roles del token JWT
+        user_roles = auth_data.get("realm_roles", [])
+        # Verificar si algun rol requerido esta presente
+        if not any(role in user_roles for role in roles):
+            logger.warning(
+                "Acceso denegado por rol. Usuario: %s, roles: %s, requeridos: %s",
+                auth_data.get("preferred_username"),
+                user_roles,
+                roles,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Acceso denegado. Se requiere uno de estos roles: {', '.join(roles)}",
+            )
+        return auth_data
+    return _role_checker
