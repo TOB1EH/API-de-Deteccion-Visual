@@ -1,11 +1,11 @@
 <template>
   <v-row class="pa-6">
     <v-col cols="12">
-      <v-btn variant="text" to="/buscar" class="mb-2 text-none" color="primary">
+      <v-btn variant="text" to="/buscar" class="mb-2 text-none" color="cyan-accent-3">
         <v-icon start>mdi-arrow-left</v-icon>
         Volver a busqueda
       </v-btn>
-      <h2 class="text-h4 font-weight-bold">Detalle del fotograma</h2>
+      <h2 class="text-h4 font-weight-bold text-cyan-accent-2">Detalle del fotograma</h2>
     </v-col>
 
     <v-col cols="12">
@@ -76,61 +76,81 @@
     </v-col>
 
     <v-col cols="12" lg="4">
-      <v-card v-if="frame" class="mb-4">
+      <v-card v-if="frame" variant="outlined" color="cyan-accent-3" class="mb-4 bg-detail-card">
         <div class="pa-4 d-flex align-center ga-3 border-b">
-          <v-avatar color="primary" variant="tonal" size="36">
-            <v-icon>mdi-information</v-icon>
+          <v-avatar color="cyan-accent-3" variant="tonal" size="36">
+            <v-icon color="cyan-accent-2">mdi-eye-outline</v-icon>
           </v-avatar>
           <div>
-            <div class="font-weight-medium">Metadatos</div>
-            <div class="text-caption text-medium-emphasis">Informacion del fotograma</div>
+            <div class="text-cyan-accent-2 font-weight-bold">Detalle del fotograma</div>
+            <div class="text-caption text-cyan-lighten-4">Informacion del fotograma</div>
           </div>
         </div>
-        <v-list density="compact" class="pa-2">
-          <v-list-item class="rounded-lg mb-1">
-            <template v-slot:prepend><v-icon color="primary" size="18">mdi-identifier</v-icon></template>
-            <v-list-item-title class="text-caption text-medium-emphasis">Frame ID</v-list-item-title>
-            <v-list-item-subtitle class="font-family-monospace text-body-2">{{ frame.frame_id }}</v-list-item-subtitle>
-          </v-list-item>
-          <v-list-item class="rounded-lg mb-1">
-            <template v-slot:prepend><v-icon color="secondary" size="18">mdi-file-code</v-icon></template>
-            <v-list-item-title class="text-caption text-medium-emphasis">Modelo</v-list-item-title>
-            <v-list-item-subtitle class="text-body-2">{{ frame.model_id }}</v-list-item-subtitle>
-          </v-list-item>
-          <v-list-item class="rounded-lg mb-1">
-            <template v-slot:prepend><v-icon color="error" size="18">mdi-map-marker</v-icon></template>
-            <v-list-item-title class="text-caption text-medium-emphasis">Ubicacion</v-list-item-title>
-            <v-list-item-subtitle class="text-body-2">{{ frame.latitude }}, {{ frame.longitude }}</v-list-item-subtitle>
-          </v-list-item>
-          <v-list-item class="rounded-lg mb-1">
-            <template v-slot:prepend><v-icon color="success" size="18">mdi-counter</v-icon></template>
-            <v-list-item-title class="text-caption text-medium-emphasis">Detecciones</v-list-item-title>
-            <v-list-item-subtitle class="text-body-2">{{ frame.detections?.length || 0 }}</v-list-item-subtitle>
-          </v-list-item>
-          <v-list-item class="rounded-lg">
-            <template v-slot:prepend><v-icon color="warning" size="18">mdi-clock-outline</v-icon></template>
-            <v-list-item-title class="text-caption text-medium-emphasis">Fecha</v-list-item-title>
-            <v-list-item-subtitle class="text-body-2">{{ new Date(frame.created_at).toLocaleString() }}</v-list-item-subtitle>
-          </v-list-item>
-        </v-list>
+        <v-sheet color="#0d1b2a" variant="flat" class="pa-3 ma-3 rounded-lg" border>
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4 font-weight-medium">ID del Fotograma:</span>
+            <span class="text-green-accent-3 font-weight-bold text-caption text-truncate ms-2" style="max-width: 160px;">{{ frame.frame_id }}</span>
+          </div>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4 font-weight-medium">Modelo:</span>
+            <span class="text-green-accent-3 font-weight-bold">{{ frame.model_id }}</span>
+          </div>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4 font-weight-medium">Coordenadas:</span>
+            <span class="text-green-accent-3 font-weight-bold">{{ frame.latitude }}, {{ frame.longitude }}</span>
+          </div>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4 font-weight-medium">Detecciones:</span>
+            <v-chip
+              v-if="(frame.detections?.length || 0) > 0"
+              color="green-accent-3"
+              class="text-black font-weight-bold"
+              size="small"
+            >
+              {{ frame.detections?.length || 0 }}
+            </v-chip>
+            <v-chip
+              v-else
+              color="amber-darken-1"
+              class="text-white font-weight-bold"
+              size="small"
+            >
+              Sin detecciones
+            </v-chip>
+          </div>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4 font-weight-medium">Fecha:</span>
+            <span class="text-green-accent-3 font-weight-bold text-caption">{{ new Date(frame.created_at).toLocaleString() }}</span>
+          </div>
+        </v-sheet>
+        <div class="pa-4 pt-0">
+          <v-btn color="cyan-accent-3" variant="outlined" block class="text-none" to="/buscar">
+            <v-icon start>mdi-arrow-left</v-icon>
+            Volver
+          </v-btn>
+        </div>
       </v-card>
 
-      <v-card v-if="frame" class="mb-4">
+      <v-card v-if="frame" variant="outlined" color="cyan-accent-3" class="mb-4 bg-detail-card">
         <div class="pa-4 d-flex align-center ga-3 border-b">
-          <v-avatar color="success" variant="tonal" size="36">
-            <v-icon>mdi-format-list-bulleted</v-icon>
+          <v-avatar color="green-accent-3" variant="tonal" size="36">
+            <v-icon color="green-accent-3">mdi-format-list-bulleted</v-icon>
           </v-avatar>
           <div>
-            <div class="font-weight-medium">Detecciones</div>
-            <div class="text-caption text-medium-emphasis">{{ frame.detections?.length || 0 }} objetos detectados</div>
+            <div class="text-cyan-accent-2 font-weight-bold">Detecciones</div>
+            <div class="text-caption text-cyan-lighten-4">{{ frame.detections?.length || 0 }} objetos detectados</div>
           </div>
         </div>
         <v-table density="compact" class="det-table">
           <thead>
             <tr>
-              <th class="text-body-2 font-weight-bold">Clase</th>
-              <th class="text-body-2 font-weight-bold text-right">Confianza</th>
-              <th class="text-body-2 font-weight-bold">Ubicacion (bbox)</th>
+              <th class="text-body-2 font-weight-bold text-cyan-lighten-4">Clase</th>
+              <th class="text-body-2 font-weight-bold text-cyan-lighten-4 text-right">Confianza</th>
+              <th class="text-body-2 font-weight-bold text-cyan-lighten-4">Ubicacion (bbox)</th>
             </tr>
           </thead>
           <tbody>
@@ -145,10 +165,10 @@
                   {{ det.class_name }}
                 </v-chip>
               </td>
-              <td class="text-right font-weight-medium">
+              <td class="text-right font-weight-bold text-green-accent-3">
                 {{ (det.confidence * 100).toFixed(0) }}%
               </td>
-              <td class="text-caption font-family-monospace text-medium-emphasis" style="font-size: 11px;">
+              <td class="text-caption font-family-monospace text-cyan-lighten-4" style="font-size: 11px;">
                 [{{ det.bbox.x_min }}, {{ det.bbox.y_min }}, {{ det.bbox.x_max }}, {{ det.bbox.y_max }}]
               </td>
             </tr>
@@ -273,13 +293,23 @@ onMounted(async () => {
 .w-100 {
   width: 100%;
 }
+.bg-detail-card {
+  background-color: #0d1b2a !important;
+}
 .det-table th {
-  background: rgba(var(--v-theme-primary), 0.04);
+  background: rgba(0, 200, 255, 0.06);
+  color: rgb(var(--v-theme-cyan-lighten-4, 150, 220, 255)) !important;
+}
+.det-table td {
+  color: rgb(var(--v-theme-cyan-lighten-4, 180, 210, 240)) !important;
 }
 .det-row {
   transition: background 0.15s;
 }
 .det-row:hover {
-  background: rgba(var(--v-theme-primary), 0.03);
+  background: rgba(0, 200, 255, 0.04);
+}
+.det-table tbody tr:nth-child(even) {
+  background: rgba(13, 27, 42, 0.5);
 }
 </style>

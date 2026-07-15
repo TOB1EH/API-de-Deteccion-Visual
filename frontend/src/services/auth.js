@@ -42,19 +42,21 @@ function extractUserFromToken(token) {
 
 export const authService = {
   async init() {
-    try {
-      // Limpiar solo hash viejos que NO contengan un codigo OAuth activo
-      if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
-        history.replaceState(null, '', window.location.pathname)
-      }
-      authState.loading = true
-      const authenticated = await keycloak.init({
-        onLoad: 'check-sso',
-        // Desactiva el iframe de verificacion de 3rd-party cookies porque
-        // Keycloak 26.x en localhost causa timeout. El login funciona igual
-        // procesando el callback OAuth directamente desde la URL.
-        checkLoginIframe: false
-      })
+     try {
+       authState.loading = true
+       const authenticated = await keycloak.init({
+         onLoad: 'check-sso',
+         // Desactiva el iframe de verificacion de 3rd-party cookies porque
+         // Keycloak 26.x en localhost causa timeout. El login funciona igual
+         // procesando el callback OAuth directamente desde la URL.
+         checkLoginIframe: false
+       })
+       // Despues de que keycloak-js proceso la respuesta (codigo, token o error),
+       // limpiamos cualquier hash residual que haya quedado en la URL para que
+       // la vista se vea limpia (sin #error=login_required visible).
+       if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
+         history.replaceState(null, '', window.location.pathname)
+       }
       console.log('[Keycloak] init result - authenticated:', authenticated)
       if (authenticated) {
         authState.token = keycloak.token

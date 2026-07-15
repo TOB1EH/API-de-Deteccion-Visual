@@ -3,13 +3,13 @@
     <v-col cols="12">
       <div class="d-flex align-center mb-6">
         <div>
-          <h2 class="text-h4 font-weight-bold">Reconocimiento facial</h2>
-          <p class="text-body-2 text-medium-emphasis mt-1">
+          <h2 class="text-h4 font-weight-bold text-cyan-accent-2">Reconocimiento facial</h2>
+          <p class="text-body-2 text-cyan-lighten-4 mt-1">
             Subi una foto para identificar a la persona contra la base de datos
           </p>
         </div>
         <v-spacer />
-        <v-chip color="primary" variant="tonal" prepend-icon="mdi-face-recognition" size="small">
+        <v-chip color="cyan-accent-3" variant="tonal" prepend-icon="mdi-face-recognition" size="small">
           threshold: {{ threshold.toFixed(2) }}
         </v-chip>
       </div>
@@ -115,74 +115,142 @@
 
     <!-- Columna de resultado -->
     <v-col cols="12" lg="6">
-      <v-card v-if="result" class="pa-6" border="start">
-        <!-- Card verde: reconocido -->
+      <v-card v-if="result" variant="outlined" color="cyan-accent-3" class="pa-6 bg-facial-card">
         <template v-if="result.person_id">
+          <!-- MATCH: Coincidencia exitosa -->
           <div class="d-flex align-center mb-4">
-            <v-avatar size="64" class="mr-4 elevation-3">
-              <v-img :src="result.image_url" alt="Rostro" />
+            <v-avatar color="green-accent-3" size="48" class="mr-3">
+              <v-icon color="black" size="28">mdi-face-recognition</v-icon>
             </v-avatar>
             <div>
-              <div class="text-h5 font-weight-bold">
+              <div class="text-green-accent-3 font-weight-black text-h5">
                 {{ result.nombre }} {{ result.apellido }}
               </div>
-              <v-chip color="success" size="small" class="mt-1 font-weight-medium">
+              <v-chip color="green-accent-3" class="text-black font-weight-bold" size="small">
                 <v-icon start size="14">mdi-check-circle</v-icon>
-                Reconocido
+                COINCIDENCIA EXITOSA
               </v-chip>
             </div>
           </div>
 
-          <v-sheet color="success" variant="tonal" rounded="xl" class="pa-4">
-            <v-row>
-              <v-col cols="6" class="text-center">
-                <div class="text-h5 font-weight-bold text-success">
+          <v-row class="mb-4">
+            <v-col cols="6">
+              <v-sheet color="#0d1b2a" variant="flat" rounded="lg" class="pa-4 text-center" border>
+                <div class="text-h4 font-weight-bold text-green-accent-3">
                   {{ (result.confidence * 100).toFixed(0) }}%
                 </div>
-                <div class="text-caption text-medium-emphasis">Confianza</div>
-              </v-col>
-              <v-col cols="6" class="text-center">
-                <div class="text-h5 font-weight-bold text-success">
+                <div class="text-caption text-cyan-lighten-4 font-weight-medium">Similitud</div>
+              </v-sheet>
+            </v-col>
+            <v-col cols="6">
+              <v-sheet color="#0d1b2a" variant="flat" rounded="lg" class="pa-4 text-center" border>
+                <div class="text-h6 font-weight-bold text-green-accent-3 text-caption text-truncate">
                   {{ result.person_id }}
                 </div>
-                <div class="text-caption text-medium-emphasis">Persona ID</div>
-              </v-col>
-            </v-row>
-          </v-sheet>
-        </template>
+                <div class="text-caption text-cyan-lighten-4 font-weight-medium">ID de Persona</div>
+              </v-sheet>
+            </v-col>
+          </v-row>
 
-        <!-- Card roja: no reconocido -->
-        <template v-else>
-          <div class="text-center mb-4">
-            <v-avatar size="80" color="error" variant="tonal" class="mb-3">
-              <v-icon size="48" color="error">mdi-face-recognition</v-icon>
-            </v-avatar>
-            <div class="text-h5 font-weight-bold">Persona no identificada</div>
-            <p class="text-body-2 text-medium-emphasis mt-1">
-              No se encontro ninguna coincidencia con la confianza minima requerida
-            </p>
-          </div>
-
-          <v-sheet color="error" variant="tonal" rounded="xl" class="pa-4">
-            <div class="text-center">
-              <div class="text-h5 font-weight-bold text-error">
-                {{ (result.confidence * 100).toFixed(0) }}%
-              </div>
-              <div class="text-caption text-medium-emphasis">
-                Confianza obtenida (minima requerida: {{ (threshold * 100).toFixed(0) }}%)
-              </div>
+          <v-sheet color="#0d1b2a" variant="flat" rounded="lg" class="pa-3 mb-4" border>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">Similitud:</span>
+              <span class="text-green-accent-3 font-weight-bold">{{ (result.confidence * 100).toFixed(1) }}%</span>
+            </div>
+            <v-divider class="my-2 border-opacity-25" />
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">Umbral minimo:</span>
+              <span class="text-green-accent-3 font-weight-bold">{{ (threshold * 100).toFixed(0) }}%</span>
+            </div>
+            <v-divider class="my-2 border-opacity-25" />
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">ID de Persona:</span>
+              <span class="text-green-accent-3 font-weight-bold text-caption text-truncate ms-2" style="max-width: 160px;">{{ result.person_id }}</span>
             </div>
           </v-sheet>
+
+          <v-row class="mb-0">
+            <v-col cols="6">
+              <v-card variant="outlined" color="cyan-darken-3" class="pa-3 text-center bg-photo-card">
+                <div class="text-caption text-cyan-lighten-4 font-weight-medium mb-1">Foto de prueba</div>
+                <v-img
+                  :src="previewUrl"
+                  max-height="120"
+                  contain
+                  class="rounded-lg"
+                />
+              </v-card>
+            </v-col>
+            <v-col cols="6">
+              <v-card variant="outlined" color="cyan-darken-3" class="pa-3 text-center bg-photo-card">
+                <div class="text-caption text-cyan-lighten-4 font-weight-medium mb-1">Foto registrada</div>
+                <v-img
+                  :src="result.image_url"
+                  max-height="120"
+                  contain
+                  class="rounded-lg"
+                />
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+
+        <template v-else>
+          <!-- NO MATCH: Persona desconocida -->
+          <div class="text-center mb-4">
+            <v-avatar size="72" color="amber-darken-1" variant="tonal" class="mb-3">
+              <v-icon size="44" color="amber-darken-1">mdi-account-question-outline</v-icon>
+            </v-avatar>
+            <div class="text-amber-darken-1 font-weight-bold text-h5">Sujeto no identificado</div>
+            <p class="text-body-2 text-cyan-lighten-4 mt-1">
+              No se encontro ninguna coincidencia con la confianza minima requerida
+            </p>
+            <v-chip color="error" class="text-white font-weight-bold" size="small">
+              <v-icon start size="14">mdi-alert-circle</v-icon>
+              DESCONOCIDO
+            </v-chip>
+          </div>
+
+          <v-sheet color="#0d1b2a" variant="flat" rounded="lg" class="pa-3 mb-4" border>
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">Similitud:</span>
+              <span class="text-amber-darken-1 font-weight-bold">{{ (result.confidence * 100).toFixed(1) }}%</span>
+            </div>
+            <v-divider class="my-2 border-opacity-25" />
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">Umbral minimo:</span>
+              <span class="text-green-accent-3 font-weight-bold">{{ (threshold * 100).toFixed(0) }}%</span>
+            </div>
+            <v-divider class="my-2 border-opacity-25" />
+            <div class="d-flex justify-space-between py-1">
+              <span class="text-cyan-lighten-4 font-weight-medium">Estado:</span>
+              <span class="text-amber-darken-1 font-weight-bold">Sin coincidencia</span>
+            </div>
+          </v-sheet>
+
+          <v-row class="mb-0">
+            <v-col cols="12">
+              <v-card variant="outlined" color="cyan-darken-3" class="pa-3 text-center bg-photo-card">
+                <div class="text-caption text-cyan-lighten-4 font-weight-medium mb-1">Foto de prueba</div>
+                <v-img
+                  :src="previewUrl"
+                  max-height="180"
+                  contain
+                  class="rounded-lg"
+                />
+              </v-card>
+            </v-col>
+          </v-row>
         </template>
       </v-card>
 
       <!-- Estado vacio -->
-      <v-card v-else class="pa-12 d-flex flex-column align-center justify-center empty-state">
-        <v-icon size="80" color="grey" class="mb-4">mdi-face-recognition</v-icon>
-        <p class="text-h6 text-medium-emphasis text-center">
+      <v-card v-else variant="outlined" color="cyan-accent-3" class="pa-12 d-flex flex-column align-center justify-center empty-state bg-facial-card">
+        <v-icon size="80" color="cyan-accent-2" class="mb-4">mdi-face-recognition</v-icon>
+        <p class="text-h6 text-cyan-lighten-4 text-center">
           Subi una foto facial para comenzar el reconocimiento
         </p>
-        <p class="text-caption text-medium-emphasis mt-1 text-center">
+        <p class="text-caption text-cyan-lighten-4 mt-1 text-center">
           El sistema buscara coincidencias en la base de datos de personas registradas
         </p>
       </v-card>
@@ -299,5 +367,11 @@ function recognizeFace() {
 }
 .empty-state {
   min-height: 380px;
+}
+.bg-facial-card {
+  background-color: #0d1b2a !important;
+}
+.bg-photo-card {
+  background-color: #0a1525 !important;
 }
 </style>

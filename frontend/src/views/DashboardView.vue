@@ -141,59 +141,81 @@
     </v-col>
 
     <v-col cols="12" lg="5">
-      <v-card v-if="result" class="pa-6" color="success" variant="tonal" border="start">
+      <v-card v-if="result" variant="outlined" color="cyan-accent-3" class="pa-6 bg-result-card">
         <div class="d-flex align-center mb-4">
-          <v-avatar color="success" size="40" class="mr-3">
-            <v-icon color="white">mdi-check-circle</v-icon>
+          <v-avatar color="green-accent-3" size="40" class="mr-3">
+            <v-icon color="black">mdi-check-circle</v-icon>
           </v-avatar>
           <div>
-            <div class="font-weight-bold">Fotograma procesado</div>
-            <div class="text-caption text-medium-emphasis">{{ result.timestamp }}</div>
+            <div class="text-cyan-accent-2 font-weight-bold">Resultado del procesamiento</div>
+            <div class="text-caption text-cyan-lighten-4">{{ result.timestamp }}</div>
           </div>
         </div>
 
-        <v-sheet color="white" rounded="xl" class="pa-4">
-          <div class="result-stats d-flex ga-4 mb-4">
-            <v-sheet color="success" variant="tonal" rounded="lg" class="pa-3 flex-1-1 text-center">
-              <div class="text-h6 font-weight-bold text-success">{{ result.detections_count }}</div>
-              <div class="text-caption text-medium-emphasis">Detecciones</div>
-            </v-sheet>
-            <v-sheet color="success" variant="tonal" rounded="lg" class="pa-3 flex-1-1 text-center">
-              <div class="text-h6 font-weight-bold text-success">{{ result.status }}</div>
-              <div class="text-caption text-medium-emphasis">Estado</div>
-            </v-sheet>
+        <v-sheet color="#0d1b2a" variant="flat" rounded="lg" class="pa-4 mb-4" border>
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4">Estado:</span>
+            <v-chip v-if="result.status === 'PROCESSED' || result.status === 'success'" color="green-accent-3" variant="flat" class="text-black font-weight-bold" size="small">
+              {{ result.status }}
+            </v-chip>
+            <span v-else class="text-green-accent-3 font-weight-bold">{{ result.status }}</span>
           </div>
-
-          <v-text-field
-            :model-value="result.frame_id"
-            label="Frame ID"
-            readonly
-            density="compact"
-            variant="outlined"
-            hide-details
-            class="mb-3"
-          >
-            <template v-slot:append-inner>
-              <v-btn
-                icon="mdi-content-copy"
-                variant="text"
-                size="x-small"
-                @click="copyFrameId"
-              />
-            </template>
-          </v-text-field>
-
-          <v-btn
-            color="primary"
-            variant="flat"
-            block
-            class="text-none"
-            :to="`/frame/${result.frame_id}`"
-          >
-            <v-icon start>mdi-eye</v-icon>
-            Ver detecciones
-          </v-btn>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4">Frame ID:</span>
+            <span class="text-green-accent-3 font-weight-bold text-caption text-truncate ms-4" style="max-width: 220px;">{{ result.frame_id }}</span>
+          </div>
+          <v-divider class="my-2 border-opacity-25" />
+          <div class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4">Detecciones:</span>
+            <span class="text-green-accent-3 font-weight-bold">{{ result.detections_count }}</span>
+          </div>
+          <v-divider v-if="result.message" class="my-2 border-opacity-25" />
+          <div v-if="result.message" class="d-flex justify-space-between py-1">
+            <span class="text-cyan-lighten-4">Mensaje:</span>
+            <span class="text-green-accent-3 font-weight-bold text-caption text-end ms-4">{{ result.message }}</span>
+          </div>
         </v-sheet>
+
+        <v-text-field
+          :model-value="result.frame_id"
+          label="Frame ID"
+          readonly
+          density="compact"
+          variant="outlined"
+          hide-details
+          class="mb-3"
+          color="cyan-accent-3"
+        >
+          <template v-slot:label>
+            <span class="text-cyan-lighten-4">Frame ID</span>
+          </template>
+          <template v-slot:append-inner>
+            <v-tooltip text="Copiar ID" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  icon="mdi-content-copy"
+                  variant="text"
+                  size="x-small"
+                  color="cyan-accent-2"
+                  @click="copyFrameId"
+                />
+              </template>
+            </v-tooltip>
+          </template>
+        </v-text-field>
+
+        <v-btn
+          color="cyan-accent-3"
+          variant="outlined"
+          block
+          class="text-none mt-2"
+          :to="`/frame/${result.frame_id}`"
+        >
+          <v-icon start>mdi-eye</v-icon>
+          Ir al Detalle del Fotograma
+        </v-btn>
       </v-card>
 
       <v-card v-else class="pa-12 d-flex flex-column align-center justify-center empty-state">
@@ -352,5 +374,8 @@ async function submitDetection() {
 .flex-1-1 { flex: 1; }
 .empty-state {
   min-height: 380px;
+}
+.bg-result-card {
+  background-color: #0d1b2a !important;
 }
 </style>
