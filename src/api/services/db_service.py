@@ -454,15 +454,16 @@ class DatabaseService:
             return False
 
     def create_person(self, person_id: str, name: str, email: str = None,
-                      metadata: dict = None) -> bool:
+                      metadata: dict = None,
+                      keycloak_user_id: str = None) -> bool:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             query = """
-            INSERT INTO persons (person_id, name, email, metadata)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO persons (person_id, name, email, keycloak_user_id, metadata)
+            VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(query, (person_id, name, email,
+            cursor.execute(query, (person_id, name, email, keycloak_user_id,
                                    json.dumps(metadata) if metadata else None))
             conn.commit()
             cursor.close()
@@ -482,10 +483,11 @@ class DatabaseService:
             conn = self.get_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             query = """
-            SELECT person_id::TEXT, name, email, metadata,
-                   created_at::TEXT, updated_at::TEXT
-            FROM persons
-            WHERE person_id = %s
+            SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
+                   p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
+            FROM persons p
+            WHERE p.person_id = %s
             """
             cursor.execute(query, (person_id,))
             result = cursor.fetchone()
@@ -501,15 +503,46 @@ class DatabaseService:
             logger.error("Error obteniendo persona: %s", e)
             return None
 
+    def get_person_by_keycloak_id(self, keycloak_user_id: str) -> Optional[dict]:
+        """
+        Busca una persona por su keycloak_user_id (sub del token JWT).
+        Retorna el mismo formato que get_person().
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            query = """
+            SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
+                   p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
+            FROM persons p
+            WHERE p.keycloak_user_id = %s
+            LIMIT 1
+            """
+            cursor.execute(query, (keycloak_user_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            if not result:
+                return None
+            d = dict(result)
+            name = d.pop("name", "")
+            d.update(self._name_to_parts(name))
+            return d
+        except Exception as e:
+            logger.error("Error obteniendo persona por keycloak_id: %s", e)
+            return None
+
     def list_persons(self) -> list[dict]:
         try:
             conn = self.get_connection()
             cursor = conn.cursor(cursor_factory=RealDictCursor)
             query = """
-            SELECT person_id::TEXT, name, email, metadata,
-                   created_at::TEXT, updated_at::TEXT
-            FROM persons
-            ORDER BY name ASC
+            SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
+                   p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
+            FROM persons p
+            ORDER BY p.name ASC
             """
             cursor.execute(query)
             results = cursor.fetchall()

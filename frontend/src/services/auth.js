@@ -13,7 +13,8 @@ export const authState = reactive({
   isDemoMode: false,
   token: null,
   user: null,
-  loading: true
+  loading: true,
+  faceVerified: false  // Se pone true despues de pasar la verificacion facial 2FA
 })
 
 // Estado global para mostrar alertas de error (ej: 403, permisos insuficientes)
@@ -127,6 +128,13 @@ export const authService = {
 
   login() {
     keycloak.login({ redirectUri: window.location.origin + '/home' })
+  },
+
+  // Inicia sesion con un Identity Provider externo (Google, GitHub, etc.)
+  // keycloak.login({ idpHint: 'google' }) redirige directamente al IdP
+  // saltando el formulario de login de Keycloak.
+  loginWithIdp(idpAlias) {
+    keycloak.login({ redirectUri: window.location.origin + '/home', idpHint: idpAlias })
   },
 
   enableDemoMode() {

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { authState, hasAnyRole } from '../services/auth'
+import { authState, hasAnyRole, isAdmin } from '../services/auth'
 
 /*
  * Cada ruta puede tener un meta.roles que define quienes pueden acceder:
@@ -70,6 +70,13 @@ const routes = [
     name: 'Facial',
     component: () => import('../views/FaceRecognitionView.vue'),
     meta: { roles: ['admin'] }
+  },
+  {
+    // Verificacion facial como segundo factor (2FA) post-login
+    path: '/face-verify',
+    name: 'FaceVerify',
+    component: () => import('../views/FaceVerifyView.vue'),
+    meta: { roles: ['admin', 'operator'] }
   },
   {
     path: '/monitoreo',
