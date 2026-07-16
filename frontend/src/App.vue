@@ -34,9 +34,6 @@
           <v-icon start size="14">mdi-account-circle</v-icon>
           {{ authState.user.username || authState.user.firstName }}
         </v-chip>
-        <v-chip v-if="authState.user.roles?.length" size="x-small" variant="flat" color="secondary" class="mr-2 font-weight-bold">
-          {{ authState.user.roles[0] }}
-        </v-chip>
         <v-btn
           icon="mdi-logout"
           variant="text"
