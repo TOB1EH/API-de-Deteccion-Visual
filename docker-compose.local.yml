@@ -122,12 +122,8 @@ services:
       KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      # KC_HOSTNAME_URL define la URL publica de Keycloak desde la perspectiva
-      # del navegador (via el proxy de Vite). Esto hace que Keycloak genere
-      # cookies y URLs con el dominio del proxy (localhost:3000) en vez de su
-      # propio dominio interno (localhost:8081), esencial para que el login
-      # funcione correctamente con cookies en entorno local.
-      KC_HOSTNAME_URL: http://localhost:3000/auth
+      # KC_HOSTNAME define el hostname que Keycloak usa para generar URLs
+      KC_HOSTNAME: localhost
       KC_HTTP_PORT: 8080
       KC_HTTP_RELATIVE_PATH: /auth
     ports:
