@@ -56,10 +56,7 @@
           Requiere configurar credenciales de Google OAuth en Keycloak admin
         </p>
 
-        <!-- Divisor -->
-        <v-divider class="my-6 text-grey">
-          O TAMBIEN PODIS
-        </v-divider>
+        <v-divider class="my-6" />
 
         <!-- Modo demo (bypass persistente para desarrollo) -->
         <v-btn
