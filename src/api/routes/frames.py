@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
+from ..services.image_utils import get_format_and_mime
 from ..schemas.frame import FrameSearchResponse, FrameSearchResult, DetectionInfo
 
 logger = logging.getLogger(__name__)
@@ -140,8 +141,12 @@ async def get_frame_image(frame_id: str, thumbnail: Optional[bool] = Query(False
             buffer = BytesIO()
             img.save(buffer, format="JPEG", quality=85)
             image_bytes = buffer.getvalue()
+            return Response(content=image_bytes, media_type="image/jpeg")
 
-        return Response(content=image_bytes, media_type="image/jpeg")
+        # Detectar formato real de la imagen para devolver Content-Type correcto
+        # (resuelve error "Not a JPEG file" cuando la imagen es PNG, WebP, etc.)
+        _, mime_type = get_format_and_mime(image_bytes)
+        return Response(content=image_bytes, media_type=mime_type)
 
     except HTTPException:
         raise

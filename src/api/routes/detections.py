@@ -19,6 +19,7 @@ from ..schemas.detection import DetectionRequest, DetectionResponse, BboxSchema,
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 from ..services.auth import require_role
+from ..services.image_utils import validate_image, get_format_and_mime
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +57,23 @@ def _run_inference(image_base64: str, model_id: str, confidence: float) -> list:
     # Decodificar base64 a bytes
     image_bytes = base64.b64decode(image_base64.split(",")[-1])
 
+    # Validar que sean bytes de una imagen valida (rechazo temprano,
+    # antes de llegar a YOLO que daria error 502 generico)
+    if not validate_image(image_bytes):
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen enviada no es un archivo de imagen valido (JPEG, PNG, WebP, BMP, GIF). "
+                   "Verifica que el base64 corresponda a una imagen."
+        )
+
+    # Detectar formato real para declarar el Content-Type correcto al inference-server
+    _, mime_type = get_format_and_mime(image_bytes)
+
     # Enviar al inference-server via requests (multipart automático)
     try:
         resp = requests.post(
             f"{inference_url}/infer",
-            files={"image": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+            files={"image": ("image." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
             data={"model_name": model_id, "confidence": confidence},
             timeout=120
         )
@@ -130,6 +143,17 @@ async def process_detections(request: DetectionRequest):
         # timestamp en formato ISO 8601 UTC (ej: 2024-06-01T12:00:00Z)
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 
+        # Validar imagen al inicio: rechazar base64 invalido antes de procesar
+        # Esto evita errores opacos 502 en inference-server o datos corruptos en SeaweedFS
+        raw_bytes = base64.b64decode(request.image_base64.split(",")[-1])
+        if not validate_image(raw_bytes):
+            raise HTTPException(
+                status_code=400,
+                detail="La imagen enviada no es un archivo de imagen valido (JPEG, PNG, WebP, BMP, GIF). "
+                       "Verifica que el base64 corresponda a una imagen."
+            )
+        img_format, img_mime = get_format_and_mime(raw_bytes)
+
         # ===== PASO 0 (opcional): Ejecutar inferencia si no vienen detecciones pre-calculadas =====
         if not request.detections:
             logger.info("[%s] Sin detecciones pre-calculadas. Ejecutando inferencia via inference-server...", frame_id)
@@ -146,7 +170,7 @@ async def process_detections(request: DetectionRequest):
 
         # ===== PASO 1: Subir imagen a SeaweedFS =====
         logger.info("[%s] Subiendo imagen a SeaweedFS...", frame_id)
-        image_url = seaweedfs_client.upload_image(request.image_base64, frame_id)
+        image_url = seaweedfs_client.upload_image(request.image_base64, frame_id, mime_type=img_mime)
 
         if not image_url:
             raise ValueError("No se pudo subir la imagen a SeaweedFS")

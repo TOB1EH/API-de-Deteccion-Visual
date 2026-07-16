@@ -22,6 +22,7 @@ from typing import Optional
 
 from ..services.db_service import db_service
 from ..services.auth import verify_token
+from ..services.image_utils import validate_image, get_format_and_mime
 from ..schemas.face import FaceEmbedUploadRequest
 
 logger = logging.getLogger(__name__)
@@ -92,12 +93,22 @@ async def verify_face(request: FaceVerifyRequest, auth_data: dict = Depends(veri
     inference_url = os.getenv("INFERENCE_SERVER_URL", "http://localhost:8001")
     image_bytes = base64.b64decode(request.image_base64.split(",")[-1])
 
+    # Validar que sea una imagen valida antes de enviar a DeepFace
+    if not validate_image(image_bytes):
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen enviada no es un archivo de imagen valido (JPEG, PNG, WebP, BMP, GIF)."
+        )
+
+    # Detectar formato real para declarar Content-Type correcto al inference-server
+    _, mime_type = get_format_and_mime(image_bytes)
+
     try:
         import requests as http_requests
 
         resp = http_requests.post(
             f"{inference_url}/face/embed",
-            files={"image": ("face.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+            files={"image": ("face." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
             timeout=120
         )
         result = resp.json()

@@ -283,7 +283,7 @@ async function downloadWithDetections() {
       const objectUrl = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = objectUrl
-      link.download = `frame-${frameId}-with-detections.jpg`
+      link.download = `frame-${frameId}-with-detections.png`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
