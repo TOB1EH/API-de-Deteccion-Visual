@@ -6,7 +6,7 @@
       elevation="0"
       class="border-b"
     >
-      <v-app-bar-title class="font-weight-bold">
+      <v-app-bar-title class="font-weight-bold" @click="$router.push('/home')" style="cursor: pointer">
         <v-icon class="mr-2" color="primary">mdi-cctv</v-icon>
         <span class="text-primary">API</span>
         <span class="text-medium-emphasis"> Deteccion Visual</span>
