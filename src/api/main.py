@@ -8,13 +8,14 @@ del sistema mediante el prefijo unificado /api y la documentación automática.
 
 import logging
 import time
+import asyncio
 from pathlib import Path
 from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import models, detections, frames, persons, face_proxy, metrics
-from .routes.metrics import REQUEST_COUNT
+from .routes.metrics import REQUEST_COUNT, inference_server_healthcheck_loop
 from .services.auth import verify_token
 from datetime import datetime, timezone
 
@@ -60,6 +61,13 @@ async def count_requests(request: Request, call_next):
         http_status=response.status_code,
     ).inc()
     return response
+
+# ===== HEALTHCHECK PERIODICO DEL INFERENCE SERVER =====
+
+@app.on_event("startup")
+async def start_inference_healthcheck():
+    asyncio.create_task(inference_server_healthcheck_loop(interval=30))
+    logger.info("Healthcheck loop del inference-server iniciado (cada 30s)")
 
 # ===== INCLUIR ROUTERS (RUTAS) =====
 # Estos prefijos se agregan a las rutas definidas en cada router

@@ -10,6 +10,7 @@ import os
 import json
 import base64
 import io
+import time
 import logging
 import requests
 from fastapi import APIRouter, HTTPException
@@ -18,6 +19,7 @@ from datetime import datetime, timezone
 from ..schemas.detection import DetectionRequest, DetectionResponse, BboxSchema, SingleDetectionRequest
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
+from ..routes.metrics import INFERENCE_TIME, DETECTION_COUNT
 
 logger = logging.getLogger(__name__)
 
@@ -131,11 +133,13 @@ async def process_detections(request: DetectionRequest):
         # ===== PASO 0 (opcional): Ejecutar inferencia si no vienen detecciones pre-calculadas =====
         if not request.detections:
             logger.info("[%s] Sin detecciones pre-calculadas. Ejecutando inferencia via inference-server...", frame_id)
+            infer_start = time.time()
             inferred_detections = _run_inference(
                 image_base64=request.image_base64,
                 model_id=request.model_id,
                 confidence=request.confidence or 0.25
             )
+            INFERENCE_TIME.observe(time.time() - infer_start)
             # Reemplazar request.detections con las detecciones inferidas
             request.detections = [
                 SingleDetectionRequest(**det) for det in inferred_detections
@@ -184,6 +188,7 @@ async def process_detections(request: DetectionRequest):
 
         # Guardar batch, donde batch es una lista de detecciones asociadas al frame_id
         detections_saved = db_service.save_detections_batch(frame_id, detections_data)
+        DETECTION_COUNT.inc(detections_saved)
         logger.info("[%s] %d detecciones guardadas", frame_id, detections_saved)
 
         # ===== PASO 4: Retornar respuesta exitosa =====
