@@ -21,7 +21,7 @@
           class="position-relative rounded-lg overflow-hidden"
           style="background: #1a1a2e;"
         >
-          <!-- Imagen: usa showThumbnail para alternar entre resolucion completa y miniatura -->
+          <!-- Imagen original del fotograma -->
           <img
             :src="currentImageUrl"
             alt="Fotograma"
@@ -37,38 +37,28 @@
           />
         </div>
 
-        <!-- Botonera inferior: toggle thumbnail + descargas -->
+        <!-- Botonera inferior: descargas -->
         <div class="d-flex ga-2 mt-3 justify-end align-center">
-          <!-- Indicador de resolucion actual -->
           <v-chip
             v-if="frame"
             size="x-small"
-            :color="showThumbnail ? 'warning' : 'success'"
+            color="success"
             variant="tonal"
             class="mr-auto"
           >
-            <v-icon start size="14">{{ showThumbnail ? 'mdi-image-size-small' : 'mdi-image' }}</v-icon>
-            {{ showThumbnail ? 'Miniatura' : 'Original' }}
+            <v-icon start size="14">mdi-image</v-icon>
+            Original
           </v-chip>
-          <!-- Toggle entre thumbnail y resolucion completa -->
-          <v-btn
-            v-if="frame"
-            variant="tonal"
-            class="text-none"
-            size="small"
-            @click="toggleThumbnail"
-          >
-            <v-icon start size="16">{{ showThumbnail ? 'mdi-image' : 'mdi-image-size-small' }}</v-icon>
-            {{ showThumbnail ? 'Ver original' : 'Ver miniatura' }}
-          </v-btn>
-          <!-- Descargar resolucion original -->
-          <v-btn variant="tonal" color="primary" class="text-none" size="small" @click="downloadImage('original')">
+          <v-btn variant="tonal" class="text-none" size="small" @click="downloadOriginal">
             <v-icon start size="16">mdi-download</v-icon>
             Original
           </v-btn>
-          <!-- Descargar miniatura -->
-          <v-btn variant="tonal" class="text-none" size="small" @click="downloadImage('thumbnail')">
-            <v-icon start size="16">mdi-image-size-small</v-icon>
+          <v-btn variant="tonal" color="primary" class="text-none" size="small" @click="downloadWithDetections">
+            <v-icon start size="16">mdi-image-multiple</v-icon>
+            Con detecciones
+          </v-btn>
+          <v-btn variant="tonal" class="text-none" size="small" @click="downloadThumbnail">
+            <v-icon start size="16">mdi-image-size-select-actual</v-icon>
             Thumbnail
           </v-btn>
         </div>
@@ -183,11 +173,10 @@
 // FrameDetailView - Vista de detalle de un fotograma procesado.
 // Muestra la imagen con overlay de bounding boxes (DetectionOverlay),
 // metadatos del frame (ID, modelo, ubicacion, fecha) y tabla de detecciones.
-// Incluye funcionalidades agregadas: toggle original/miniatura (thumbnail)
-// y descarga de imagen en ambas resoluciones.
+// Permite descargar la imagen original o con las detecciones renderizadas.
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getFrame, getFrameImageUrl } from '../services/api'
+import { getFrame, api } from '../services/api'
 import DetectionOverlay from '../components/DetectionOverlay.vue'
 
 const route = useRoute()
@@ -197,28 +186,18 @@ const error = ref('')
 const naturalWidth = ref(0)
 const naturalHeight = ref(0)
 
-// Controla si se muestra la imagen original o la miniatura (thumbnail=true)
-const showThumbnail = ref(false)
-
-// URL actual de la imagen segun el toggle thumbnail.
-// Usa la URL directa de SeaweedFS para la imagen original,
-// y el endpoint de la API con ?thumbnail=true para la miniatura.
 const currentImageUrl = computed(() => {
   if (!frame.value) return ''
-  const frameId = frame.value.frame_id || route.params.id
-  if (showThumbnail.value) {
-    return getFrameImageUrl(frameId, true)
-  }
   return frame.value.image_url
 })
 
 const CLASS_COLORS = {
-  person: 'red',
-  car: 'blue',
-  dog: 'orange',
-  bicycle: 'green',
-  cat: 'purple',
-  default: 'grey'
+  person: '#EF4444',
+  car: '#3B82F6',
+  dog: '#F97316',
+  bicycle: '#22C55E',
+  cat: '#A855F7',
+  default: '#6B7280'
 }
 
 function getColor(className) {
@@ -231,43 +210,116 @@ function onImageLoad(e) {
   naturalHeight.value = img.naturalHeight
 }
 
-// Alterna entre mostrar la imagen original y la miniatura (thumbnail)
-function toggleThumbnail() {
-  showThumbnail.value = !showThumbnail.value
-}
-
-// Descarga la imagen (original o thumbnail) usando un enlace temporal.
-// Para thumbnail, agrega el parametro ?thumbnail=true a la URL del backend.
-// Para original, descarga la URL completa de SeaweedFS.
-async function downloadImage(type) {
+async function downloadOriginal() {
   const frameId = frame.value?.frame_id || route.params.id
-  if (!frameId) return
+  const url = frame.value?.image_url
+  if (!frameId || !url) return
   try {
-    // Para thumbnail usa el endpoint de la API, para original usa SeaweedFS directo
-    const url = type === 'thumbnail'
-      ? getFrameImageUrl(frameId, true)
-      : frame.value?.image_url
-    if (!url) return
-
-    const filename = type === 'thumbnail'
-      ? `frame-${frameId}-thumbnail.jpg`
-      : `frame-${frameId}.jpg`
-
-    // Crea un enlace temporal para forzar la descarga
     const response = await fetch(url)
     const blob = await response.blob()
     const objectUrl = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = objectUrl
-    link.download = filename
+    link.download = `frame-${frameId}.jpg`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    // Libera la URL creada para evitar memory leaks
     URL.revokeObjectURL(objectUrl)
   } catch (err) {
     console.error('[FrameDetail] Error descargando imagen:', err)
   }
+}
+
+async function downloadWithDetections() {
+  const frameId = frame.value?.frame_id || route.params.id
+  const url = frame.value?.image_url
+  const dets = frame.value?.detections
+  if (!frameId || !url || !dets?.length) return
+  try {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.src = url
+    await img.decode()
+
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+
+    const scale = img.naturalWidth / 800
+    for (const det of dets) {
+      const color = getColor(det.class_name)
+      const x = det.bbox.x_min
+      const y = det.bbox.y_min
+      const w = det.bbox.x_max - det.bbox.x_min
+      const h = det.bbox.y_max - det.bbox.y_min
+
+      ctx.fillStyle = colorWithOpacity(color, 0.15)
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2.5 * scale
+      ctx.beginPath()
+      ctx.roundRect(x, y, w, h, 4)
+      ctx.fill()
+      ctx.stroke()
+
+      const label = `${det.class_name} ${(det.confidence * 100).toFixed(0)}%`
+      const lx = x
+      const ly = y > 26 ? y - 22 : y + h + 4
+      const lw = label.length * 7 + 8
+
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.roundRect(lx, ly, lw, 20, 3)
+      ctx.fill()
+
+      ctx.fillStyle = 'white'
+      ctx.font = `bold ${11 * scale}px sans-serif`
+      ctx.fillText(label, lx + 4, ly + 14)
+    }
+
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = `frame-${frameId}-with-detections.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    }, 'image/png')
+  } catch (err) {
+    console.error('[FrameDetail] Error descargando con detecciones:', err)
+  }
+}
+
+async function downloadThumbnail() {
+  const frameId = frame.value?.frame_id || route.params.id
+  if (!frameId) return
+  try {
+    const { data } = await api.get(`/frames/${frameId}`, {
+      params: { thumbnail: true },
+      responseType: 'blob'
+    })
+    const objectUrl = URL.createObjectURL(data)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = `frame-${frameId}-thumbnail.jpg`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+  } catch (err) {
+    console.error('[FrameDetail] Error descargando thumbnail:', err)
+  }
+}
+
+function colorWithOpacity(hex, opacity) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${opacity})`
 }
 
 onMounted(async () => {

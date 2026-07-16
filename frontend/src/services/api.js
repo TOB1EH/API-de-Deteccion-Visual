@@ -342,6 +342,8 @@ export function getFrameImageUrl(frameId, thumbnail = false) {
   return thumbnail ? `${url}?thumbnail=true` : url
 }
 
+export { api }
+
 // Convierte un File (imagen) a base64 (sin prefijo data:image/...)
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
