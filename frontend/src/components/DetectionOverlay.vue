@@ -24,20 +24,18 @@
       />
       <rect
         :x="det.bbox.x_min"
-        :y="det.bbox.y_min - 22"
+        :y="labelY(det)"
         :width="labelWidth(det)"
         :height="20"
         :fill="getColor(det.class_name)"
         rx="3"
-        v-if="det.bbox.y_min > 26"
       />
       <text
         :x="det.bbox.x_min + 4"
-        :y="det.bbox.y_min - 7"
+        :y="labelY(det) + 14"
         fill="white"
         font-size="11"
         font-weight="bold"
-        v-if="det.bbox.y_min > 26"
       >
         {{ det.class_name }} {{ (det.confidence * 100).toFixed(0) }}%
       </text>
@@ -76,6 +74,13 @@ function colorWithOpacity(className, opacity) {
 function labelWidth(det) {
   const text = `${det.class_name} ${(det.confidence * 100).toFixed(0)}%`
   return text.length * 7 + 8
+}
+
+function labelY(det) {
+  // Si hay espacio arriba (>= 26px), poner etiqueta arriba del bbox
+  if (det.bbox.y_min > 26) return det.bbox.y_min - 22
+  // Si no, ponerla abajo
+  return det.bbox.y_max + 4
 }
 </script>
 
