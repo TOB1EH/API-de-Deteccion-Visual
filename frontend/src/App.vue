@@ -1,5 +1,5 @@
 <template>
-  <v-app :theme="theme">
+  <v-app theme="dark">
     <v-app-bar
       v-if="showAppBar"
       color="surface"
@@ -46,14 +46,6 @@
         />
       </template>
 
-      <v-divider vertical class="mx-2" />
-
-      <v-btn
-        :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        variant="text"
-        size="small"
-        @click="toggleTheme"
-      />
     </v-app-bar>
 
     <v-main>
@@ -87,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authState, authService, authError, hasAnyRole, isAdmin } from './services/auth'
 
@@ -98,18 +90,6 @@ const showAppBar = computed(() => route.name !== 'Login')
 
 function doLogout() {
   authService.logout()
-}
-
-const stored = localStorage.getItem('theme')
-const isDark = ref(stored !== 'light')
-const theme = computed(() => isDark.value ? 'dark' : 'light')
-
-watch(isDark, (val) => {
-  localStorage.setItem('theme', val ? 'dark' : 'light')
-})
-
-function toggleTheme() {
-  isDark.value = !isDark.value
 }
 
 // Items de navegacion con roles requeridos (undefined = cualquier rol autenticado)
