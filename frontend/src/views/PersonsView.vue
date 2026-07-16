@@ -56,7 +56,7 @@
               <td>
                 <span class="text-medium-emphasis">{{ p.email || '-' }}</span>
               </td>
-              <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at).toLocaleDateString() }}</td>
+              <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at + 'Z').toLocaleDateString() }}</td>
               <td class="text-center">
                 <v-icon color="success" size="small">mdi-check-circle</v-icon>
               </td>

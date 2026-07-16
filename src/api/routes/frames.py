@@ -8,6 +8,7 @@ Actividad S4 (Servicio de consulta): Proporciona un endpoint de búsqueda con
 filtros por geolocalización (lat/lon) y tipos de objetos detectados (clases).
 """
 import logging
+from datetime import timezone
 from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 from ..services.db_service import db_service
@@ -100,7 +101,7 @@ async def search_frames(
                     "camera_id": row.get("camera_id"),
                     "source": row.get("source")
                 },
-                created_at=row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+                    created_at=row["created_at"].replace(tzinfo=timezone.utc).isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
                 detections=[
                     DetectionInfo(
                         detection_id=d["detection_id"],
@@ -174,7 +175,7 @@ async def get_frame_detail(frame_id: str):
                 "camera_id": frame.get("camera_id"),
                 "source": frame.get("source")
             },
-            "created_at": frame["created_at"].isoformat() if hasattr(frame["created_at"], "isoformat") else str(frame["created_at"]),
+            "created_at": frame["created_at"].replace(tzinfo=timezone.utc).isoformat() if hasattr(frame["created_at"], "isoformat") else str(frame["created_at"]),
             "detections": [
                 {
                     "detection_id": d["detection_id"],

@@ -153,10 +153,14 @@ onMounted(async () => {
   }
 })
 
-// Formatea una fecha ISO a formato local legible
+// Formatea una fecha ISO a formato local legible.
+// Se agrega 'Z' para que el navegador interprete el timestamp como UTC
+// independientemente de si el backend lo incluye o no.
+// Esto funciona globalmente: toLocaleString() convierte automaticamente
+// a la zona horaria del usuario (ART, JST, CET, etc.)
 function formatDate(dateStr) {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('es-AR', {
+  return new Date(dateStr + 'Z').toLocaleString('es-AR', {
     year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })

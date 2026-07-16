@@ -34,7 +34,7 @@
       <div class="d-flex align-center">
         <v-icon size="14" color="medium-emphasis" class="mr-1">mdi-calendar</v-icon>
         <span class="text-caption text-medium-emphasis">
-          {{ new Date(frame.created_at).toLocaleDateString() }}
+          {{ new Date(frame.created_at + 'Z').toLocaleDateString() }}
         </span>
       </div>
       <div class="d-flex align-center mt-1">

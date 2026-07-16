@@ -131,54 +131,8 @@
         </v-card>
       </v-col>
 
-      <!-- Columna derecha: Estado del servidor -->
+      <!-- Columna derecha: Modelos Activos -->
       <v-col cols="12" md="4">
-        <v-card variant="outlined" class="pa-4 mb-4">
-          <div class="d-flex align-center mb-4">
-            <v-icon color="green-accent-3" class="mr-2">mdi-server</v-icon>
-            <h3 class="text-h6 font-weight-bold">Estado del Servidor</h3>
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">CPU Inferencia</span>
-              <span class="font-weight-medium">42%</span>
-            </div>
-            <v-progress-linear
-              :model-value="42"
-              color="cyan-accent-3"
-              height="6"
-              rounded
-            />
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">Memoria GPU</span>
-              <span class="font-weight-medium">3.2 / 8 GB</span>
-            </div>
-            <v-progress-linear
-              :model-value="40"
-              color="indigo-accent-3"
-              height="6"
-              rounded
-            />
-          </div>
-
-          <div>
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">Uso de disco (SeaweedFS)</span>
-              <span class="font-weight-medium">1.8 / 10 GB</span>
-            </div>
-            <v-progress-linear
-              :model-value="18"
-              color="amber"
-              height="6"
-              rounded
-            />
-          </div>
-        </v-card>
-
         <v-card variant="outlined" class="pa-4">
           <div class="d-flex align-center mb-4">
             <v-icon color="amber" class="mr-2">mdi-brain</v-icon>
@@ -242,7 +196,7 @@ const modelsLoaded = ref(false)
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('es-AR', {
+  return new Date(dateStr + 'Z').toLocaleString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
