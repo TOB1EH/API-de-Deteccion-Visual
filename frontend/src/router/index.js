@@ -14,9 +14,10 @@ const routes = [
     redirect: '/home'
   },
   {
-    path: '/home',
-    name: 'Home',
-    component: () => import('../views/HomeView.vue')
+    path: '/monitoreo',
+    name: 'Monitoreo',
+    component: () => import('../views/MonitoreoView.vue'),
+    meta: { roles: ['admin', 'operator'] }
   },
   {
     path: '/login',
