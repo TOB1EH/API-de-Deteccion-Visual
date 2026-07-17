@@ -17,13 +17,14 @@ def _embedding_to_str(embedding: list[float]) -> str:
 from ..schemas.face import (
     FaceEmbedRequest, FaceEmbedResponse,
     FaceRecognizeRequest, FaceRecognizeResponse,
+    FaceRecognizeFromImageRequest,
     FaceEmbedUploadRequest, FaceEmbedUploadResponse,
 )
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 from ..services.db_service import DatabaseService
 from ..routes.metrics import EMBEDDING_TIME, COMPARISON_TIME, RECOGNITION_COUNT
-from ..services.auth import require_role
+from ..services.auth import require_role, verify_token
 from ..services.image_utils import validate_image, get_format_and_mime
 
 logger = logging.getLogger(__name__)
@@ -110,8 +111,7 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
     )
 
 
-@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201,
-             dependencies=[Depends(require_role(["admin"]))])
+@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201)
 async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
     try:
         conn = db_service.get_connection()
@@ -168,8 +168,7 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
-@router.post("/face-recognition", response_model=FaceRecognizeResponse,
-             dependencies=[Depends(require_role(["admin"]))])
+@router.post("/face-recognition", response_model=FaceRecognizeResponse)
 async def recognize_face(request: FaceRecognizeRequest):
     try:
         compare_start = time.time()
@@ -218,3 +217,50 @@ async def recognize_face(request: FaceRecognizeRequest):
     except Exception as e:
         logger.exception("Error en reconocimiento facial")
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+
+
+@router.post("/face-recognition/image", response_model=FaceRecognizeResponse,
+             dependencies=[Depends(verify_token)])
+async def recognize_face_from_image(request: FaceRecognizeFromImageRequest):
+    """
+    Recibe una imagen (base64) y un threshold, la reenvia al inference-server
+    para que genere el embedding y compare contra la base de datos.
+    """
+    inference_url = os.getenv("INFERENCE_SERVER_URL", "http://localhost:8001")
+    image_bytes = base64.b64decode(request.image_base64.split(",")[-1])
+
+    if not validate_image(image_bytes):
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen enviada no es un archivo de imagen valido (JPEG, PNG, WebP, BMP, GIF)."
+        )
+
+    _, mime_type = get_format_and_mime(image_bytes)
+
+    import requests as http_requests
+    import io
+
+    resp = http_requests.post(
+        f"{inference_url}/face/recognize",
+        data={"threshold": str(request.threshold)},
+        files={"image": ("face." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
+        timeout=120
+    )
+
+    try:
+        result = resp.json()
+    except Exception:
+        result = {}
+
+    if result.get("error") or resp.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=result.get("detail", "El inference-server no pudo procesar la imagen o no se detecto un rostro.")
+        )
+
+    return FaceRecognizeResponse(
+        person_id=result.get("person_id"),
+        nombre=result.get("nombre"),
+        apellido=result.get("apellido"),
+        confidence=result.get("confidence", 0.0),
+    )

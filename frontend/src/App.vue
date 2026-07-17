@@ -43,6 +43,7 @@
         />
       </template>
 
+      <LocalServerStatus class="mr-2" />
     </v-app-bar>
 
     <v-main>
@@ -79,6 +80,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { authState, authService, authError, hasAnyRole, isAdmin } from './services/auth'
+import LocalServerStatus from './components/LocalServerStatus.vue'
 
 const route = useRoute()
 const router = useRouter()
