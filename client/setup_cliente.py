@@ -219,6 +219,12 @@ def fetch_model_list():
         else:
             print_warn("No se encontraron modelos en la nube.")
         return models
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print_warn("Autenticacion requerida para listar modelos. Ejecuta 'python3 setup_cliente.py faces login' primero.")
+        else:
+            print_error(f"Error consultando modelos: {e}")
+        return []
     except Exception as e:
         print_error(f"Error consultando modelos: {e}")
         return []
