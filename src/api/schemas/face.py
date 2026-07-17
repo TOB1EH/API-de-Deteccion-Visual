@@ -17,6 +17,11 @@ class FaceEmbedResponse(BaseModel):
     image_url: str
 
 
+class FaceRecognizeFromImageRequest(BaseModel):
+    image_base64: str
+    threshold: float = Field(0.8, ge=0.0, le=1.0)
+
+
 class FaceRecognizeRequest(BaseModel):
     embedding: list[float]
     threshold: float = Field(0.8, ge=0.0, le=1.0)
