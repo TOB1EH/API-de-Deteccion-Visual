@@ -101,7 +101,7 @@
       },
       "targets": [
         {
-          "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"api_requests_total\" and r.http_status =~ /^5/) |> aggregateWindow(every: 1m, fn: max, createEmpty: false) |> difference(columns: [\"_value\"]) |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then 0.0 else r._value })) |> truncateTimeColumn(unit: 1m) |> group(columns: [\"_field\", \"_measurement\"]) |> aggregateWindow(every: 1m, fn: sum, createEmpty: false) |> yield(name: \"errores\")",
+          "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"api_requests_total\") |> map(fn: (r) => ({ r with _value: if exists r.http_status and r.http_status =~ /^5/ then float(v: r._value) else 0.0 })) |> aggregateWindow(every: 1m, fn: max, createEmpty: false) |> difference(columns: [\"_value\"]) |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then 0.0 else r._value })) |> truncateTimeColumn(unit: 1m) |> group(columns: [\"_field\", \"_measurement\"]) |> aggregateWindow(every: 1m, fn: sum, createEmpty: false) |> yield(name: \"errores\")",
           "refId": "A"
         }
       ],
