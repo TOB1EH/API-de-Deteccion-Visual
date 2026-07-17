@@ -8,7 +8,7 @@ from pathlib import Path
 
 import cv2
 import requests
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from ultralytics import YOLO
@@ -23,7 +23,7 @@ logger = logging.getLogger("yolo-server")
 app = FastAPI(
     title="YOLO Inference + Face Recognition Server",
     description="Servidor de inferencia YOLO y reconocimiento facial DeepFace.",
-    version="2.1.0",
+    version="2.2.0",
 )
 
 DEFAULT_CORS_ORIGINS = "https://bfts2026.mooo.com"
@@ -40,6 +40,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def add_private_network_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 MODELS_DIR = Path("/app/models")
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
