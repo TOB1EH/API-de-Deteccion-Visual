@@ -791,25 +791,8 @@ def cmd_persons_get(args):
 def _embed_one_image(person_id, image_path):
     with open(image_path, "rb") as f:
         img_data = f.read()
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="image"; filename="image.jpg"\r\n'
-        f"Content-Type: image/jpeg\r\n\r\n"
-    ).encode() + img_data + (
-        f"\r\n--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="person_id"\r\n\r\n'
-        f"{person_id}\r\n"
-        f"--{boundary}--\r\n"
-    ).encode()
-
-    url = FACE_INFER_URL.rstrip("/") + "/face/embed"
-    req = urllib.request.Request(
-        url, data=body,
-        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
-    )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode())
+    b64 = base64.b64encode(img_data).decode("utf-8")
+    return api_post(f"persons/{person_id}/face-embed", {"image_base64": b64, "confidence": 0.8})
 
 
 def cmd_faces_login(args):
@@ -875,18 +858,16 @@ def cmd_faces_embed(args):
     total = len(images)
     success = 0
     errors = 0
-    print(f"  Conectando a: {FACE_INFER_URL.rstrip('/')}/face/embed")
+    print(f"  Conectando a: {API_BASE}/api/persons/{person_id}/face-embed")
 
     for i, image_path in enumerate(images, 1):
         print(f"\n[{i}/{total}] {os.path.basename(image_path)}")
         try:
             result = _embed_one_image(person_id, image_path)
-            print_ok(f"Embedding ID: {result['embedding_id']}")
+            print_ok(f"Embedding ID: {result.get('embedding_id', 'N/A')}")
             print(f"  Persona ID: {result['person_id']}")
             print(f"  Imagen URL: {result.get('image_url', 'N/A')}")
-            print(f"  Procesadas: {result['processed_images']}, "
-                  f"Validas: {result['valid_embeddings']}, "
-                  f"Rechazadas: {result['rejected_images']}")
+            print(f"  Validas: {result.get('valid_embeddings', 0)}")
             success += 1
         except urllib.error.HTTPError as e:
             error_body = e.read().decode()
