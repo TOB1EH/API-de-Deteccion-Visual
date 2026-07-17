@@ -1,10 +1,14 @@
-const LOCAL_INFER_URL = 'http://localhost:8001'
+export const LOCAL_INFER_URL = 'http://localhost:8001'
 
 export async function checkLocalServer() {
   try {
-    const res = await fetch(`${LOCAL_INFER_URL}/health`, { signal: AbortSignal.timeout(3000) })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch(`${LOCAL_INFER_URL}/health`, { signal: controller.signal })
+    clearTimeout(timeoutId)
     return res.ok
-  } catch {
+  } catch (err) {
+    console.debug('[checkLocalServer] No se pudo conectar al servidor local:', err.message)
     return false
   }
 }
