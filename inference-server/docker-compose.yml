@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  inference-server:
+    image: tfunes/inference-server:latest
+    container_name: inference-server
+    ports:
+      - "8000:8000"
+    environment:
+      - CORS_ORIGINS=https://bfts2026.mooo.com
+      - API_URL=https://bfts2026.mooo.com
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
