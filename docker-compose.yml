@@ -110,7 +110,9 @@ services:
     container_name: yolo_inference_server
     environment:
       # URL de la API para que el inference-server pueda persistir datos faciales
-      API_URL: http://api:8000
+      # En VM usa http://api:8000 (red interna Docker)
+      # En local usar: API_URL=https://bfts2026.mooo.com en .env
+      API_URL: ${API_URL:-http://api:8000}
       DEEPFACE_BACKEND: Facenet
     volumes:
       # Modelos YOLO montados en la ruta que espera inference-server

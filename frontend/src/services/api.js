@@ -292,22 +292,11 @@ export async function createPerson(personData) {
   )
 }
 
-// POST /api/persons/{personId}/face-embed - Sube foto facial y genera embedding
-// Envia imagen en base64, la API la envia al inference-server (DeepFace)
-// y persiste embedding + imagen en BD + SeaweedFS
 export async function postFaceEmbed(personId, { image_base64, confidence }) {
-  return withFallback(
-    async () => {
-      const { data } = await api.post(`/persons/${personId}/face-embed`, {
-        image_base64, confidence
-      })
-      return data
-    },
-    async () => {
-      await delay(1500)
-      return { person_id: personId, valid_embeddings: 1, embedding_id: `mock-${Date.now()}`, image_url: '' }
-    }
-  )
+  const { data } = await api.post(`/persons/${personId}/face-embed`, {
+    image_base64, confidence
+  })
+  return data
 }
 
 // --- Reconocimiento facial ---
