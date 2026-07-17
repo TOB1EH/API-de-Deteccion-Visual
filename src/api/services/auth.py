@@ -78,12 +78,11 @@ def verify_token(
     if path in PUBLIC_PATHS:
         return {"sub": "anonymous", "roles": []}
 
-    # Permitir llamadas internas (inference-server) a rutas especificas
-    for internal_path in INTERNAL_PATHS:
-        if path.startswith(internal_path) and _is_internal_request(request):
-            return {"sub": "internal", "roles": ["internal"]}
-
     if credentials is None:
+        # Permitir llamadas internas (inference-server) a rutas especificas
+        for internal_path in INTERNAL_PATHS:
+            if path.startswith(internal_path) and _is_internal_request(request):
+                return {"sub": "internal", "roles": ["internal"]}
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de autorizacion requerido",
