@@ -33,6 +33,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 import subprocess
+import uuid
 
 # ==============================================================================
 # CONFIGURACION
@@ -799,8 +800,33 @@ def cmd_persons_get(args):
 def _embed_one_image(person_id, image_path):
     with open(image_path, "rb") as f:
         img_data = f.read()
-    b64 = base64.b64encode(img_data).decode("utf-8")
-    return api_post(f"persons/{person_id}/face-embed", {"image_base64": b64, "confidence": 0.8})
+
+    token = load_token()
+    boundary = "----WebKitFormBoundary" + str(uuid.uuid4().hex)
+    filename = os.path.basename(image_path)
+
+    body_parts = [
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"person_id\"\r\n\r\n{person_id}\r\n".encode()
+    ]
+    if token:
+        body_parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"token\"\r\n\r\n{token}\r\n".encode()
+        )
+    body_parts.append(
+        f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"{filename}\"\r\nContent-Type: image/jpeg\r\n\r\n".encode()
+    )
+    body_parts.append(img_data)
+    body_parts.append(f"\r\n--{boundary}--\r\n".encode())
+
+    body = b"".join(body_parts)
+
+    req = urllib.request.Request(
+        "http://localhost:8001/face/embed",
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return json.loads(resp.read().decode())
 
 
 def cmd_faces_login(args):
