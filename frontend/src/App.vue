@@ -1,12 +1,12 @@
 <template>
-  <v-app :theme="theme">
+  <v-app theme="dark">
     <v-app-bar
       v-if="showAppBar"
       color="surface"
       elevation="0"
       class="border-b"
     >
-      <v-app-bar-title class="font-weight-bold">
+      <v-app-bar-title class="font-weight-bold" @click="$router.push('/home')" style="cursor: pointer">
         <v-icon class="mr-2" color="primary">mdi-cctv</v-icon>
         <span class="text-primary">API</span>
         <span class="text-medium-emphasis"> Deteccion Visual</span>
@@ -28,7 +28,7 @@
         {{ item.label }}
       </v-btn>
 
-      <!-- Usuario logueado y logout -->
+      <!-- Usuario logueado, rol y logout -->
       <template v-if="authState.authenticated && authState.user">
         <v-chip size="small" variant="tonal" color="primary" class="mr-2">
           <v-icon start size="14">mdi-account-circle</v-icon>
@@ -43,14 +43,6 @@
         />
       </template>
 
-      <v-divider vertical class="mx-2" />
-
-      <v-btn
-        :icon="isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
-        variant="text"
-        size="small"
-        @click="toggleTheme"
-      />
     </v-app-bar>
 
     <v-main>
@@ -64,13 +56,29 @@
         </router-view>
       </v-container>
     </v-main>
+
+    <!-- Snackbar global para errores de autenticacion/permisos (401/403).
+         Se activa desde el interceptor de api.js cuando el backend rechaza
+         una peticion por falta de permisos. -->
+    <v-snackbar
+      v-model="authError.show"
+      color="error"
+      timeout="5000"
+      location="top"
+    >
+      <v-icon start>mdi-shield-off</v-icon>
+      {{ authError.message }}
+      <template v-slot:actions>
+        <v-btn variant="text" @click="authError.show = false">Cerrar</v-btn>
+      </template>
+    </v-snackbar>
   </v-app>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { authState, authService } from './services/auth'
+import { authState, authService, authError, hasAnyRole, isAdmin } from './services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,26 +89,24 @@ function doLogout() {
   authService.logout()
 }
 
-const stored = localStorage.getItem('theme')
-const isDark = ref(stored !== 'light')
-const theme = computed(() => isDark.value ? 'dark' : 'light')
-
-watch(isDark, (val) => {
-  localStorage.setItem('theme', val ? 'dark' : 'light')
-})
-
-function toggleTheme() {
-  isDark.value = !isDark.value
-}
-
-const navItems = [
+// Items de navegacion con roles requeridos (undefined = cualquier rol autenticado)
+const allNavItems = [
   { to: '/home', icon: 'mdi-view-dashboard', label: 'Inicio' },
-  { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar' },
+  { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar', roles: ['admin', 'operator'] },
   { to: '/buscar', icon: 'mdi-magnify', label: 'Buscar' },
-  { to: '/personas', icon: 'mdi-account-group', label: 'Personas' },
-  { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial' },
+  { to: '/personas', icon: 'mdi-account-group', label: 'Personas', roles: ['admin', 'operator'] },
+  { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial', roles: ['admin'] },
   { to: '/monitoreo', icon: 'mdi-monitor-dashboard', label: 'NOC' }
 ]
+
+// Filtramos los items de navegacion segun los roles del usuario autenticado:
+// Si el item requiere ciertos roles y el usuario no los tiene, se oculta.
+const navItems = computed(() => {
+  return allNavItems.filter(item => {
+    if (!item.roles) return true
+    return hasAnyRole(item.roles)
+  })
+})
 
 function isActive(to) {
   return route.path.startsWith(to)

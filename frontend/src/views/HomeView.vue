@@ -131,54 +131,8 @@
         </v-card>
       </v-col>
 
-      <!-- Columna derecha: Estado del servidor -->
+      <!-- Columna derecha: Modelos Activos -->
       <v-col cols="12" md="4">
-        <v-card variant="outlined" class="pa-4 mb-4">
-          <div class="d-flex align-center mb-4">
-            <v-icon color="green-accent-3" class="mr-2">mdi-server</v-icon>
-            <h3 class="text-h6 font-weight-bold">Estado del Servidor</h3>
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">CPU Inferencia</span>
-              <span class="font-weight-medium">42%</span>
-            </div>
-            <v-progress-linear
-              :model-value="42"
-              color="cyan-accent-3"
-              height="6"
-              rounded
-            />
-          </div>
-
-          <div class="mb-4">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">Memoria GPU</span>
-              <span class="font-weight-medium">3.2 / 8 GB</span>
-            </div>
-            <v-progress-linear
-              :model-value="40"
-              color="indigo-accent-3"
-              height="6"
-              rounded
-            />
-          </div>
-
-          <div>
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span class="text-grey-lighten-1">Uso de disco (SeaweedFS)</span>
-              <span class="font-weight-medium">1.8 / 10 GB</span>
-            </div>
-            <v-progress-linear
-              :model-value="18"
-              color="amber"
-              height="6"
-              rounded
-            />
-          </div>
-        </v-card>
-
         <v-card variant="outlined" class="pa-4">
           <div class="d-flex align-center mb-4">
             <v-icon color="amber" class="mr-2">mdi-brain</v-icon>
@@ -187,8 +141,6 @@
 
           <div v-if="models.length > 0">
             <div
-              <!-- Las cards de modelos ahora son clickeables (cursor: pointer)
-                   y al hacer click navegan a ModelDetailView para ver detalle. -->
               v-for="model in models"
               :key="model.name"
               class="d-flex align-center pa-3 mb-2"
@@ -210,9 +162,13 @@
             </div>
           </div>
 
-          <div v-else class="text-center pa-4">
+          <div v-else-if="!modelsLoaded" class="text-center pa-4">
             <v-progress-circular indeterminate color="cyan-accent-3" size="32" />
             <p class="text-caption text-grey mt-2">Cargando modelos...</p>
+          </div>
+          <div v-else class="text-center pa-4">
+            <v-icon size="36" color="grey-darken-1" class="mb-2">mdi-file-remove</v-icon>
+            <p class="text-caption text-grey">No hay modelos disponibles</p>
           </div>
         </v-card>
       </v-col>
@@ -236,10 +192,11 @@ const kpis = ref([
 
 const recentFrames = ref([])
 const models = ref([])
+const modelsLoaded = ref(false)
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('es-AR', {
+  return new Date(dateStr + 'Z').toLocaleString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
@@ -264,31 +221,38 @@ function goToModel(modelName) {
 }
 
 onMounted(async () => {
-  try {
-    const [modelsData, personsData, framesData] = await Promise.all([
-      getModels(),
-      getPersons(),
-      searchFrames({ limit: 6 })
-    ])
+  // Cada llamada se maneja por separado para que el error de una no
+  // bloquee las otras. Los servicios tienen fallback a mock interno,
+  // pero si el token no tiene permisos (403) igualmente se usa mock.
+  const [modelsData, personsData, framesData] = await Promise.allSettled([
+    getModels(),
+    getPersons(),
+    searchFrames({ limit: 6 })
+  ])
 
-    if (modelsData?.models) {
-      models.value = modelsData.models
-      kpis.value[3].value = String(modelsData.total || modelsData.models.length)
-    }
+  if (modelsData.status === 'fulfilled' && modelsData.value?.models) {
+    models.value = modelsData.value.models
+    kpis.value[3].value = String(modelsData.value.total || modelsData.value.models.length)
+  } else {
+    console.warn('[HomeView] Error cargando modelos:', modelsData.reason)
+    // Si fallo la carga, mostrar "No hay modelos disponibles"
+  }
+  modelsLoaded.value = true
 
-    if (personsData?.persons) {
-      kpis.value[2].value = String(personsData.total || personsData.persons.length)
-    }
+  if (personsData.status === 'fulfilled' && personsData.value?.persons) {
+    kpis.value[2].value = String(personsData.value.total || personsData.value.persons.length)
+  } else {
+    console.warn('[HomeView] Error cargando personas:', personsData.reason)
+  }
 
-    if (framesData?.frames) {
-      recentFrames.value = framesData.frames.slice(0, 6)
-      kpis.value[0].value = String(framesData.total || framesData.frames.length)
+  if (framesData.status === 'fulfilled' && framesData.value?.frames) {
+    recentFrames.value = framesData.value.frames.slice(0, 6)
+    kpis.value[0].value = String(framesData.value.total || framesData.value.frames.length)
 
-      const totalDetections = framesData.frames.reduce((sum, f) => sum + (f.detections_count || 0), 0)
-      kpis.value[1].value = String(totalDetections)
-    }
-  } catch (err) {
-    console.error('[HomeView] Error cargando datos:', err)
+    const totalDetections = framesData.value.frames.reduce((sum, f) => sum + (f.detections_count || 0), 0)
+    kpis.value[1].value = String(totalDetections)
+  } else {
+    console.warn('[HomeView] Error cargando frames:', framesData.reason)
   }
 })
 </script>

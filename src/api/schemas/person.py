@@ -15,6 +15,8 @@ class PersonResponse(BaseModel):
     nombre: str
     apellido: str
     email: Optional[str] = None
+    keycloak_user_id: Optional[str] = None
+    has_faces: bool = False
     metadata: Optional[dict[str, Any]] = None
     created_at: str
     updated_at: str

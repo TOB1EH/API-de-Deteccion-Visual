@@ -13,8 +13,61 @@ export const authState = reactive({
   isDemoMode: false,
   token: null,
   user: null,
-  loading: true
+  loading: true,
+  faceVerified: false  // Se pone true despues de pasar la verificacion facial 2FA
 })
+
+// Estado global para mostrar alertas de error (ej: 403, permisos insuficientes)
+export const authError = reactive({
+  message: '',
+  show: false,
+})
+
+// Muestra una alerta de error de autenticacion/autorizacion al usuario.
+// Se conecta con el interceptor 403 de api.js y con App.vue para mostrar un snackbar.
+export function showAuthError(msg) {
+  authError.message = msg
+  authError.show = true
+  // Oculta automaticamente despues de 5 segundos
+  setTimeout(() => {
+    authError.show = false
+    authError.message = ''
+  }, 5000)
+}
+
+// ===== FUNCIONES AYUDANTES PARA VERIFICAR ROLES =====
+// Los roles se extraen del token JWT de Keycloak (realm_access.roles).
+// En modo demo, se asume operador para poder probar las funcionalidades basicas.
+
+// Verifica si el usuario autenticado tiene el rol especificado.
+// Retorna true si el usuario es admin, operator, o tiene el rol exacto.
+export function hasRole(role) {
+  // En modo demo, devolvemos true para roles no restrictivos
+  if (authState.isDemoMode) return true
+  if (!authState.authenticated || !authState.user) return false
+  const roles = authState.user.roles || []
+  return roles.includes(role)
+}
+
+// Verifica si el usuario tiene ALGUNO de los roles de la lista.
+export function hasAnyRole(roles) {
+  // En modo demo, devolvemos true
+  if (authState.isDemoMode) return true
+  if (!authState.authenticated || !authState.user) return false
+  const userRoles = authState.user.roles || []
+  return roles.some(role => userRoles.includes(role))
+}
+
+// Verifica si el usuario es admin (tiene el rol 'admin').
+export function isAdmin() {
+  return hasRole('admin')
+}
+
+// Verifica si el usuario puede escribir/editar datos en el sistema:
+// admin siempre puede, operator puede escribir cierto tipo de datos.
+export function canWrite() {
+  return hasAnyRole(['admin', 'operator'])
+}
 
 const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
@@ -42,19 +95,21 @@ function extractUserFromToken(token) {
 
 export const authService = {
   async init() {
-    try {
-      // Limpiar solo hash viejos que NO contengan un codigo OAuth activo
-      if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
-        history.replaceState(null, '', window.location.pathname)
-      }
-      authState.loading = true
-      const authenticated = await keycloak.init({
-        onLoad: 'check-sso',
-        // Desactiva el iframe de verificacion de 3rd-party cookies porque
-        // Keycloak 26.x en localhost causa timeout. El login funciona igual
-        // procesando el callback OAuth directamente desde la URL.
-        checkLoginIframe: false
-      })
+     try {
+       authState.loading = true
+       const authenticated = await keycloak.init({
+         onLoad: 'check-sso',
+         // Desactiva el iframe de verificacion de 3rd-party cookies porque
+         // Keycloak 26.x en localhost causa timeout. El login funciona igual
+         // procesando el callback OAuth directamente desde la URL.
+         checkLoginIframe: false
+       })
+       // Despues de que keycloak-js proceso la respuesta (codigo, token o error),
+       // limpiamos cualquier hash residual que haya quedado en la URL para que
+       // la vista se vea limpia (sin #error=login_required visible).
+       if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
+         history.replaceState(null, '', window.location.pathname)
+       }
       console.log('[Keycloak] init result - authenticated:', authenticated)
       if (authenticated) {
         authState.token = keycloak.token
@@ -73,6 +128,13 @@ export const authService = {
 
   login() {
     keycloak.login({ redirectUri: window.location.origin + '/home' })
+  },
+
+  // Inicia sesion con un Identity Provider externo (Google, GitHub, etc.)
+  // keycloak.login({ idpHint: 'google' }) redirige directamente al IdP
+  // saltando el formulario de login de Keycloak.
+  loginWithIdp(idpAlias) {
+    keycloak.login({ redirectUri: window.location.origin + '/home', idpHint: idpAlias })
   },
 
   enableDemoMode() {

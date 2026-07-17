@@ -19,7 +19,20 @@ export default defineConfig({
     proxy: {
       '/auth': {
         target: 'http://localhost:8081',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // Keycloak 26 marca todas las cookies de sesion como Secure,
+            // pero estamos en HTTP local. Sacamos Secure y SameSite=None
+            // para que el navegador las acepte.
+            const setCookie = proxyRes.headers['set-cookie']
+            if (setCookie) {
+              proxyRes.headers['set-cookie'] = Array.isArray(setCookie)
+                ? setCookie.map(c => c.replace(/;\s*Secure/gi, '').replace(/;\s*SameSite=None/gi, '; SameSite=Lax'))
+                : setCookie.replace(/;\s*Secure/gi, '').replace(/;\s*SameSite=None/gi, '; SameSite=Lax')
+            }
+          })
+        }
       }
     }
   }

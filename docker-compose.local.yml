@@ -122,6 +122,7 @@ services:
       KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # KC_HOSTNAME define el hostname que Keycloak usa para generar URLs
       KC_HOSTNAME: localhost
       KC_HTTP_PORT: 8080
       KC_HTTP_RELATIVE_PATH: /auth

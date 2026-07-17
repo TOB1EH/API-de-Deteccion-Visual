@@ -73,32 +73,7 @@
                     prepend-inner-icon="mdi-arrow-right-bold"
                   />
                 </v-col>
-                <!-- Filtro por ID de camara (camera_id): permite buscar fotogramas
-                     capturados por una camara especifica (ej: cam-001, cam-002).
-                     El backend filtra por coincidencia exacta. -->
-                <v-col cols="6" md="3" lg="2">
-                  <v-text-field
-                    v-model="filters.camera_id"
-                    label="Camara ID"
-                    placeholder="cam-001"
-                    clearable
-                    prepend-inner-icon="mdi-cctv"
-                  />
-                </v-col>
-                <!-- Filtro por fuente de origen (source): permite buscar fotogramas
-                     segun su procedencia (web, camara, mobile, upload).
-                     Usa un v-select con opciones predefinidas. -->
-                <v-col cols="6" md="3" lg="2">
-                  <v-select
-                    v-model="filters.source"
-                    label="Fuente"
-                    :items="['', 'web', 'camara', 'mobile', 'upload']"
-                    clearable
-                    prepend-inner-icon="mdi-source-branch"
-                    hint="Origen de la imagen"
-                    persistent-hint
-                  />
-                </v-col>
+
               </v-row>
             </v-expansion-panel-text>
           </v-expansion-panel>
@@ -222,25 +197,16 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil(filteredFrames.value.length / itemsPerPage.value))
 )
 
-// Objeto reactivo con todos los filtros de busqueda.
-// Los campos camera_id y source se agregaron para permitir filtrar
-// por camara especifica y fuente de origen respectivamente.
-// El backend (GET /api/frames/search) ya soportaba estos parametros
-// pero el frontend no los exponia en el formulario.
 const filters = reactive({
   clases: '',
   lat_min: '',
   lat_max: '',
   lon_min: '',
-  lon_max: '',
-  camera_id: '',
-  source: ''
+  lon_max: ''
 })
 
-// Detecta si hay algun filtro activo para mostrar el chip "activos".
-// Incluye los nuevos filtros camera_id y source ademas de los clasicos.
 const hasActiveFilters = computed(() =>
-  filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max || filters.camera_id || filters.source
+  filters.clases || filters.lat_min || filters.lat_max || filters.lon_min || filters.lon_max
 )
 
 function resetFilters() {
@@ -249,8 +215,6 @@ function resetFilters() {
   filters.lat_max = ''
   filters.lon_min = ''
   filters.lon_max = ''
-  filters.camera_id = ''
-  filters.source = ''
   searched.value = false
   filteredFrames.value = []
 }
@@ -269,9 +233,7 @@ async function doSearch() {
       lat_min: filters.lat_min,
       lat_max: filters.lat_max,
       lon_min: filters.lon_min,
-      lon_max: filters.lon_max,
-      camera_id: filters.camera_id || undefined,
-      source: filters.source || undefined
+      lon_max: filters.lon_max
     })
     filteredFrames.value = data.frames || []
   } catch (err) {

@@ -10,6 +10,7 @@ import base64
 from typing import Optional
 import os
 from io import BytesIO
+from .image_utils import get_format_and_mime, get_extension
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,15 @@ class SeaweedFSClient:
             "https://bfts2026.mooo.com/seaweed"
         )
 
-    def upload_image(self, image_base64: str, frame_id: str) -> Optional[str]:
+    def upload_image(self, image_base64: str, frame_id: str, mime_type: Optional[str] = None) -> Optional[str]:
         """
         Sube una imagen (codificada en base64) a SeaweedFS
 
         Args:
             image_base64: Imagen en base64
             frame_id: ID único para nombrar la imagen
+            mime_type: MIME type real de la imagen (ej: image/png, image/webp).
+                       Si es None, se detecta automaticamente de los magic bytes.
 
         Returns:
             URL pública de la imagen, o None si error
@@ -44,9 +47,17 @@ class SeaweedFSClient:
                 image_base64 = image_base64.split(",", 1)[1]
             image_bytes = base64.b64decode(image_base64)
 
+            # Si no se especifico MIME type, detectar de los magic bytes
+            if mime_type is None:
+                _, mime_type = get_format_and_mime(image_bytes)
+
+            # Extension de archivo acorde al formato real
+            image_format = mime_type.split("/")[-1]
+            ext = get_extension(image_format)
+
             # Preparar request a SeaweedFS
             files = {
-                'file': (f"{frame_id}.jpg", BytesIO(image_bytes), 'image/jpeg')
+                'file': (f"{frame_id}.{ext}", BytesIO(image_bytes), mime_type)
             }
 
             # Subir a SeaweedFS
@@ -62,7 +73,7 @@ class SeaweedFSClient:
                 file_id = data.get('fid')
 
                 # Formato estandar: /fid.ext
-                public_url = f"{self.seaweed_public_url}/{file_id}.jpg"
+                public_url = f"{self.seaweed_public_url}/{file_id}.{ext}"
                 return public_url
             else:
                 logger.error("Error uploading to SeaweedFS: %d - %s", response.status_code, response.text)

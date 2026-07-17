@@ -27,7 +27,7 @@
             class="max-w-300"
           />
           <v-spacer />
-          <v-btn color="primary" @click="openNewDialog" class="text-none" elevation="2">
+          <v-btn v-if="isAdmin()" color="primary" @click="openNewDialog" class="text-none" elevation="2">
             <v-icon start>mdi-account-plus</v-icon>
             Nueva persona
           </v-btn>
@@ -56,7 +56,7 @@
               <td>
                 <span class="text-medium-emphasis">{{ p.email || '-' }}</span>
               </td>
-              <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at).toLocaleDateString() }}</td>
+              <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at + 'Z').toLocaleDateString() }}</td>
               <td class="text-center">
                 <v-icon color="success" size="small">mdi-check-circle</v-icon>
               </td>
@@ -97,8 +97,9 @@
               <v-icon start>mdi-account-details</v-icon>
               Ver detalle
             </v-btn>
-            <!-- Boton para editar datos de la persona -->
+            <!-- Boton para editar datos de la persona (solo admin) -->
             <v-btn
+              v-if="isAdmin()"
               color="warning"
               variant="tonal"
               class="text-none"
@@ -107,8 +108,9 @@
               <v-icon start>mdi-pencil</v-icon>
               Editar
             </v-btn>
-            <!-- Boton para eliminar persona con confirmacion -->
+            <!-- Boton para eliminar persona con confirmacion (solo admin) -->
             <v-btn
+              v-if="isAdmin()"
               color="error"
               variant="tonal"
               class="text-none"
@@ -117,8 +119,9 @@
               <v-icon start>mdi-delete</v-icon>
               Eliminar
             </v-btn>
-            <!-- Boton para subir fotos faciales -->
+            <!-- Boton para subir fotos faciales (solo admin) -->
             <v-btn
+              v-if="isAdmin()"
               color="primary"
               class="text-none"
               elevation="3"
@@ -206,6 +209,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64 } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
+import { isAdmin, authState } from '../services/auth'
 
 const router = useRouter()
 

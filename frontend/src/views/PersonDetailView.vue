@@ -33,8 +33,8 @@
             <div class="text-h5 font-weight-bold">{{ person.nombre }} {{ person.apellido }}</div>
             <div class="text-body-2 text-medium-emphasis">{{ person.email || 'Sin email' }}</div>
           </div>
-          <!-- Botones de accion: editar y eliminar -->
-          <div class="d-flex ga-2">
+          <!-- Botones de accion (solo admin puede editar/eliminar) -->
+          <div v-if="isAdmin()" class="d-flex ga-2">
             <v-btn color="warning" variant="tonal" class="text-none" @click="goToEdit">
               <v-icon start>mdi-pencil</v-icon>
               Editar
@@ -124,6 +124,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPerson, deletePerson } from '../services/api'
+import { isAdmin } from '../services/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -152,10 +153,14 @@ onMounted(async () => {
   }
 })
 
-// Formatea una fecha ISO a formato local legible
+// Formatea una fecha ISO a formato local legible.
+// Se agrega 'Z' para que el navegador interprete el timestamp como UTC
+// independientemente de si el backend lo incluye o no.
+// Esto funciona globalmente: toLocaleString() convierte automaticamente
+// a la zona horaria del usuario (ART, JST, CET, etc.)
 function formatDate(dateStr) {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('es-AR', {
+  return new Date(dateStr + 'Z').toLocaleString('es-AR', {
     year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })

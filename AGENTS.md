@@ -33,6 +33,20 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
   - Detector: MTCNN | Modelo: Facenet | Normalizacion: Facenet
 - CLI setup_cliente.py descargable desde GET /setup_cliente.py
 
+### Autenticacion (Keycloak OAuth2/JWT)
+
+- Validacion de tokens JWT via JWKS de Keycloak (`verify_token` en `src/api/services/auth.py`)
+- Control de acceso por roles (`require_role` en `src/api/services/auth.py`)
+- Roles definidos: `admin`, `operator`, `viewer`
+- Permisos por endpoint:
+  - **GET /api/models/**, **GET /api/frames/**, **GET /api/detections/{id}** -> admin/operator/viewer
+  - **GET /api/persons/** (listar/detalle) -> admin/operator (viewer no)
+  - **GET /api/models/{name}/download** -> admin/operator (viewer solo lectura)
+  - **POST /api/detections** -> admin/operator
+  - **POST /api/persons**, **PUT /api/persons/{id}** -> admin
+  - **DELETE /api/persons/{id}** -> admin
+  - **POST /api/persons/{id}/face-embed**, **POST /api/persons/{id}/embeddings**, **POST /api/face-recognition** -> admin
+
 ### Stack tecnologico
 
 | Componente | Tecnologia |
@@ -43,6 +57,7 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 | BD | PostgreSQL 16 + pgvector |
 | Storage | SeaweedFS |
 | Proxy | Nginx + Let's Encrypt |
+| Autenticacion | Keycloak (OAuth2/JWT + RBAC) |
 
 ## Problemas conocidos (a corregir)
 
@@ -58,7 +73,6 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 
 | Modulo | Descripcion |
 |---|---|
-| Keycloak | Autenticacion OAuth2/JWT, roles admin/operator/viewer |
 | Frontend | UI web (React/Vue) que consuma las APIs |
 | Monitoreo | Telegraf + InfluxDB + Grafana |
 | Auth biometrica | Login por reconocimiento facial (opcional) |
@@ -69,7 +83,7 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 |---|---|
 | A | Multiples embeddings + auth biometrica |
 | B | Frontend web + indice pgvector + limpiar Dockerfile |
-| C | Keycloak + Monitoreo (Grafana) |
+| C | Monitoreo (Grafana) |
 | D | Errores CLI + docstring + ayudar integracion |
 
 ### Archivos de referencia en docs/

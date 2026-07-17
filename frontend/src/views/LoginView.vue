@@ -38,10 +38,25 @@
           Autenticacion corporativa OAuth2 con Keycloak
         </p>
 
-        <!-- Divisor -->
-        <v-divider class="my-6 text-grey">
-          O TAMBIEN PODIS
-        </v-divider>
+        <!-- Boton de Google (Social Login via Keycloak IdP) -->
+        <v-btn
+          color="red-darken-2"
+          block
+          size="large"
+          class="text-none py-5 mb-2"
+          elevation="4"
+          :loading="keycloakLoading"
+          @click="handleGoogleLogin"
+        >
+          <v-icon start size="22">mdi-google</v-icon>
+          Iniciar sesion con Google
+        </v-btn>
+
+        <p class="text-caption text-grey mt-1 mb-4 text-center">
+          Requiere configurar credenciales de Google OAuth en Keycloak admin
+        </p>
+
+        <v-divider class="my-6" />
 
         <!-- Modo demo (bypass persistente para desarrollo) -->
         <v-btn
@@ -130,6 +145,30 @@ function handleKeycloakLogin() {
     if (keycloakLoading.value) {
       keycloakLoading.value = false
       errorMessage.value = 'No se pudo conectar con el servidor de autenticacion. Verifique su red o use el Modo Demo.'
+      showError.value = true
+    }
+  }, 5000)
+}
+
+// Login con Google (Social Login via Keycloak Identity Provider)
+// keycloak.login({ idpHint: 'google' }) redirige directamente a la pantalla
+// de autenticacion de Google, omitiendo el formulario de Keycloak.
+// Requiere que el IdP de Google este configurado en Keycloak (realm JSON).
+function handleGoogleLogin() {
+  keycloakLoading.value = true
+  try {
+    // idpHint le indica a Keycloak que use el proveedor de identidad "google"
+    authService.loginWithIdp('google')
+  } catch (e) {
+    keycloakLoading.value = false
+    errorMessage.value = 'Error al iniciar login con Google: ' + e.message
+    showError.value = true
+  }
+  // Timeout de seguridad igual que el login normal
+  setTimeout(() => {
+    if (keycloakLoading.value) {
+      keycloakLoading.value = false
+      errorMessage.value = 'No se pudo conectar con Google. Verifique su red.'
       showError.value = true
     }
   }, 5000)

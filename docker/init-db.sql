@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS persons (
     person_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
+    keycloak_user_id VARCHAR(255),
     metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -169,6 +170,21 @@ CREATE INDEX IF NOT EXISTS idx_face_embeddings_ivfflat
     USING ivfflat (embedding vector_cosine_ops)
     WITH (lists = 100);
 COMMENT ON INDEX idx_face_embeddings_ivfflat IS 'Búsqueda aproximada de rostros similares (distancia cosine).';
+
+-- ============================================================================
+-- MIGRACION: Agregar columna keycloak_user_id a tabla persons existentes
+-- Usa DO bloque para evitar error si la columna ya existe
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'persons' AND column_name = 'keycloak_user_id'
+    ) THEN
+        ALTER TABLE persons ADD COLUMN keycloak_user_id VARCHAR(255);
+        COMMENT ON COLUMN persons.keycloak_user_id IS 'ID del usuario de Keycloak vinculado a esta persona (sub del token JWT)';
+    END IF;
+END $$;
 
 -- ============================================================================
 -- RESULTADO FINAL

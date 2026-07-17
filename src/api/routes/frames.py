@@ -8,10 +8,12 @@ Actividad S4 (Servicio de consulta): Proporciona un endpoint de búsqueda con
 filtros por geolocalización (lat/lon) y tipos de objetos detectados (clases).
 """
 import logging
+from datetime import timezone
 from fastapi import APIRouter, HTTPException, Query, Response
 from typing import Optional
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
+from ..services.image_utils import get_format_and_mime
 from ..schemas.frame import FrameSearchResponse, FrameSearchResult, DetectionInfo
 
 logger = logging.getLogger(__name__)
@@ -99,7 +101,7 @@ async def search_frames(
                     "camera_id": row.get("camera_id"),
                     "source": row.get("source")
                 },
-                created_at=row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+                    created_at=row["created_at"].replace(tzinfo=timezone.utc).isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
                 detections=[
                     DetectionInfo(
                         detection_id=d["detection_id"],
@@ -140,8 +142,12 @@ async def get_frame_image(frame_id: str, thumbnail: Optional[bool] = Query(False
             buffer = BytesIO()
             img.save(buffer, format="JPEG", quality=85)
             image_bytes = buffer.getvalue()
+            return Response(content=image_bytes, media_type="image/jpeg")
 
-        return Response(content=image_bytes, media_type="image/jpeg")
+        # Detectar formato real de la imagen para devolver Content-Type correcto
+        # (resuelve error "Not a JPEG file" cuando la imagen es PNG, WebP, etc.)
+        _, mime_type = get_format_and_mime(image_bytes)
+        return Response(content=image_bytes, media_type=mime_type)
 
     except HTTPException:
         raise
@@ -169,7 +175,7 @@ async def get_frame_detail(frame_id: str):
                 "camera_id": frame.get("camera_id"),
                 "source": frame.get("source")
             },
-            "created_at": frame["created_at"].isoformat() if hasattr(frame["created_at"], "isoformat") else str(frame["created_at"]),
+            "created_at": frame["created_at"].replace(tzinfo=timezone.utc).isoformat() if hasattr(frame["created_at"], "isoformat") else str(frame["created_at"]),
             "detections": [
                 {
                     "detection_id": d["detection_id"],

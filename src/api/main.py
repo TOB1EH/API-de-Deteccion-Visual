@@ -14,8 +14,8 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import models, detections, frames, persons, face_proxy, metrics
 from .routes.metrics import REQUEST_COUNT, inference_server_healthcheck_loop
+from .routes import models, detections, frames, persons, face_proxy, metrics, auth
 from .services.auth import verify_token
 from datetime import datetime, timezone
 
@@ -78,6 +78,7 @@ app.include_router(detections.router, prefix="/api", dependencies=auth_deps)   #
 app.include_router(frames.router, prefix="/api", dependencies=auth_deps)       # GET /api/frames, /api/frames/search
 app.include_router(persons.router, prefix="/api", dependencies=auth_deps)      # POST/GET /api/persons
 app.include_router(face_proxy.router, prefix="/api", dependencies=auth_deps)  # POST /api/faces/embeddings, /api/faces/recognize
+app.include_router(auth.router, prefix="/api", dependencies=auth_deps)        # POST /api/auth/verify-face
 app.include_router(metrics.router)  
 
 # ===== ENDPOINTS GLOBALES =====

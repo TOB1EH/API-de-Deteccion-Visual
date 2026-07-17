@@ -1,9 +1,10 @@
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from uuid import uuid4
 from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
+from ..services.auth import require_role, verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +15,14 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=PersonResponse, status_code=201)
-async def create_person(request: PersonCreate):
+@router.post("", response_model=PersonResponse, status_code=201,
+             dependencies=[Depends(require_role(["admin"]))])
+async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_token)):
     try:
         person_id = str(uuid4())
+        # Extraer el sub del token JWT como keycloak_user_id para vincular
+        # la persona registrada con el usuario de Keycloak que la creo
+        keycloak_user_id = auth_data.get("sub")
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
 
@@ -25,7 +30,8 @@ async def create_person(request: PersonCreate):
             person_id=person_id,
             name=name,
             email=request.email,
-            metadata=request.metadata
+            metadata=request.metadata,
+            keycloak_user_id=keycloak_user_id
         )
 
         if not saved:
@@ -39,6 +45,7 @@ async def create_person(request: PersonCreate):
             nombre=request.nombre,
             apellido=request.apellido,
             email=request.email,
+            keycloak_user_id=keycloak_user_id,
             metadata=request.metadata or {},
             created_at=timestamp,
             updated_at=timestamp
@@ -54,7 +61,8 @@ async def create_person(request: PersonCreate):
         )
 
 
-@router.put("/{person_id}", response_model=PersonResponse)
+@router.put("/{person_id}", response_model=PersonResponse,
+            dependencies=[Depends(require_role(["admin"]))])
 async def update_person(person_id: str, request: PersonUpdate):
     """
     Actualiza los datos de una persona existente.
@@ -100,6 +108,8 @@ async def update_person(person_id: str, request: PersonUpdate):
             nombre=request.nombre,
             apellido=request.apellido,
             email=request.email,
+            keycloak_user_id=existing.get("keycloak_user_id"),
+            has_faces=existing.get("has_faces", False),
             metadata=request.metadata or {},
             created_at=existing["created_at"],
             updated_at=timestamp
@@ -115,7 +125,8 @@ async def update_person(person_id: str, request: PersonUpdate):
         )
 
 
-@router.delete("/{person_id}", status_code=204)
+@router.delete("/{person_id}", status_code=204,
+               dependencies=[Depends(require_role(["admin"]))])
 async def delete_person(person_id: str):
     """
     Elimina una persona y sus embeddings asociados.
@@ -159,7 +170,31 @@ async def delete_person(person_id: str):
         )
 
 
-@router.get("/{person_id}", response_model=PersonResponse)
+@router.get("/me", response_model=PersonResponse,
+            dependencies=[Depends(require_role(["admin", "operator"]))])
+async def get_my_person(auth_data: dict = Depends(verify_token)):
+    """
+    Retorna la persona vinculada al usuario autenticado (segun keycloak_user_id).
+    GET /api/persons/me
+
+    Requiere que la persona haya sido creada con sesion iniciada para que
+    el keycloak_user_id quede registrado. Si no hay vinculacion, retorna 404.
+    """
+    keycloak_user_id = auth_data.get("sub")
+    if not keycloak_user_id:
+        raise HTTPException(status_code=400, detail="Token invalido: sin sub")
+
+    person = db_service.get_person_by_keycloak_id(keycloak_user_id)
+    if not person:
+        raise HTTPException(
+            status_code=404,
+            detail="No hay persona vinculada a este usuario. Cree una persona primero."
+        )
+    return PersonResponse(**person)
+
+
+@router.get("/{person_id}", response_model=PersonResponse,
+            dependencies=[Depends(require_role(["admin", "operator"]))])
 async def get_person(person_id: str):
     try:
         person = db_service.get_person(person_id)
@@ -179,7 +214,8 @@ async def get_person(person_id: str):
         )
 
 
-@router.get("", response_model=PersonListResponse)
+@router.get("", response_model=PersonListResponse,
+            dependencies=[Depends(require_role(["admin", "operator"]))])
 async def list_persons():
     try:
         persons = db_service.list_persons()
