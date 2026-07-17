@@ -210,6 +210,7 @@ import { useRouter } from 'vue-router'
 import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64 } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
 import { isAdmin, authState } from '../services/auth'
+import { checkLocalServer, localFaceEmbed } from '../services/inference'
 
 const router = useRouter()
 
@@ -222,6 +223,7 @@ const facesInput = ref(null)
 const uploading = ref(false)
 const uploadMsg = ref('')
 const uploadError = ref(false)
+const hasLocalServer = ref(false)
 
 // Estado del dialogo de eliminacion
 const deleteDialog = ref(false)
@@ -297,6 +299,7 @@ onMounted(async () => {
   } catch {
     persons.value = []
   }
+  hasLocalServer.value = await checkLocalServer()
 })
 
 function openNewDialog() {
@@ -338,11 +341,16 @@ async function onFacesSelected(e) {
 
   for (const file of files) {
     try {
-      const image_base64 = await fileToBase64(file)
-      const result = await postFaceEmbed(selectedPerson.value.person_id, {
-        image_base64,
-        confidence: 0.8
-      })
+      let result
+      if (hasLocalServer.value) {
+        result = await localFaceEmbed(selectedPerson.value.person_id, file, authState.token)
+      } else {
+        const image_base64 = await fileToBase64(file)
+        result = await postFaceEmbed(selectedPerson.value.person_id, {
+          image_base64,
+          confidence: 0.8
+        })
+      }
       if (result.valid_embeddings > 0) {
         successCount++
       } else {
