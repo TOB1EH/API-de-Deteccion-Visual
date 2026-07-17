@@ -237,6 +237,7 @@ services:
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_SERVER_DOMAIN: bfts2026.mooo.com
       GF_SERVER_ENABLE_GZIP: "false"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
       INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-soa-token}
     volumes:
       - grafana_data:/var/lib/grafana
