@@ -26,12 +26,14 @@ PUBLIC_PATHS = [
     "/api/openapi.json",
     "/metrics",
     "/nginx-health",
+    "/api/face-recognition",
 ]
 
 # Rutas internas que no requieren autenticacion cuando la llamada
 # proviene de la red interna de Docker (inference-server, etc.)
 INTERNAL_PATHS = [
     "/api/persons/",
+    "/api/face-recognition",
 ]
 
 
