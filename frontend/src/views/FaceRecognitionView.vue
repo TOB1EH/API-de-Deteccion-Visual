@@ -259,8 +259,9 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { MOCK_RECOGNITION, MOCK_RECOGNITION_FAIL } from '../services/mock'
+import { ref, onMounted } from 'vue'
+import { recognizeFaceFromImage } from '../services/api'
+import { checkLocalServer, localFaceRecognize } from '../services/inference'
 
 const fileInput = ref(null)
 const imageFile = ref(null)
@@ -269,9 +270,13 @@ const isDragging = ref(false)
 const loading = ref(false)
 const error = ref('')
 const result = ref(null)
+const useLocal = ref(false)
 
-// Threshold de confianza: valor minimo para considerar un reconocimiento valido
 const threshold = ref(0.80)
+
+onMounted(async () => {
+  useLocal.value = await checkLocalServer()
+})
 
 function triggerFileInput() {
   fileInput.value?.click()
@@ -304,32 +309,40 @@ function clearFile() {
   }
 }
 
-function recognizeFace() {
+async function recognizeFace() {
   if (!imageFile.value) return
   loading.value = true
   error.value = ''
   result.value = null
 
-  // Simula el tiempo de procesamiento del reconocimiento facial
-  setTimeout(() => {
-    // Decide aleatoriamente si el reconocimiento es exitoso o no
-    // Simula que la confianza obtenida es mayor o menor al threshold
-    const isMatch = Math.random() > 0.4
-
-    if (isMatch) {
-      result.value = {
-        ...MOCK_RECOGNITION,
-        confidence: Math.min(threshold.value + Math.random() * 0.15, 0.99)
-      }
+  try {
+    if (useLocal.value) {
+      const data = await localFaceRecognize(imageFile.value, threshold.value)
+      result.value = data
     } else {
-      result.value = {
-        ...MOCK_RECOGNITION_FAIL,
-        confidence: Math.max(threshold.value - Math.random() * 0.3, 0.1)
+      const reader = new FileReader()
+      reader.onload = async () => {
+        try {
+          const base64 = reader.result
+          const data = await recognizeFaceFromImage(base64, threshold.value)
+          result.value = data
+        } catch (e) {
+          error.value = e.message || 'Error al reconocer rostro'
+        } finally {
+          loading.value = false
+        }
       }
+      reader.onerror = () => {
+        error.value = 'Error al leer la imagen'
+        loading.value = false
+      }
+      reader.readAsDataURL(imageFile.value)
+      return
     }
-
-    loading.value = false
-  }, 1500)
+  } catch (e) {
+    error.value = e.message || 'Error al reconocer rostro'
+  }
+  loading.value = false
 }
 </script>
 

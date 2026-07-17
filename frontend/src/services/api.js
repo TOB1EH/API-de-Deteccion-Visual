@@ -312,16 +312,14 @@ export async function postFaceEmbed(personId, { image_base64, confidence }) {
 
 // --- Reconocimiento facial ---
 
-// POST /api/face-recognition - Reconoce un rostro
-// La API real espera un embedding (vector), no imagen. Mientras el pipeline
-// de embeddings no este integrado, siempre usa mock.
-export async function recognizeFace({ image_base64, threshold }) {
-  await delay(1500)
-  const isMatch = Math.random() > 0.4
-  if (isMatch) {
-    return { ...MOCK_RECOGNITION, confidence: Math.min(threshold + Math.random() * 0.15, 0.99) }
-  }
-  return { ...MOCK_RECOGNITION_FAIL, confidence: Math.max(threshold - Math.random() * 0.3, 0.1) }
+// POST /api/face-recognition/image - Reconoce un rostro a partir de una imagen
+// Envia la imagen a la API remota (con auth JWT), que la reenvia al inference-server.
+export async function recognizeFaceFromImage(imageBase64, threshold = 0.8) {
+  const { data } = await api.post('/face-recognition/image', {
+    image_base64: imageBase64,
+    threshold
+  })
+  return data
 }
 
 // --- Utilidades ---
