@@ -321,6 +321,8 @@ def start_container(models_dir):
         cmd.extend(["-e", f"API_URL={API_URL}"])
     deepface_backend = os.environ.get("DEEPFACE_BACKEND", "Facenet")
     cmd.extend(["-e", f"DEEPFACE_BACKEND={deepface_backend}"])
+    cors_origins = os.environ.get("CORS_ORIGINS", "https://bfts2026.mooo.com")
+    cmd.extend(["-e", f"CORS_ORIGINS={cors_origins}"])
     cmd.append(DOCKER_IMAGE)
     try:
         subprocess.run(cmd, check=True, timeout=60)
