@@ -14,6 +14,11 @@ const routes = [
     redirect: '/home'
   },
   {
+    path: '/home',
+    name: 'Home',
+    component: () => import('../views/HomeView.vue')
+  },
+  {
     path: '/monitoreo',
     name: 'Monitoreo',
     component: () => import('../views/MonitoreoView.vue'),
@@ -79,11 +84,6 @@ const routes = [
     component: () => import('../views/FaceVerifyView.vue'),
     meta: { roles: ['admin', 'operator'] }
   },
-  {
-    path: '/monitoreo',
-    name: 'Monitoreo',
-    component: () => import('../views/MonitoreoView.vue')
-  }
 ]
 
 const router = createRouter({
