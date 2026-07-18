@@ -1,21 +1,28 @@
 """
-Rutas para autenticacion biométrica facial como segundo factor (2FA).
+Rutas para autenticacion biométrica facial.
 
-Flujo:
-1. Usuario se loguea con Keycloak (password) -> obtiene access_token
-2. Frontend verifica si el usuario tiene una persona vinculada con embeddings faciales
-   (GET /api/persons/me -> has_faces)
-3. Si tiene rostros registrados, frontend muestra pantalla de verificacion facial
-4. Usuario se toma una foto, frontend la envia a POST /api/auth/verify-face
-5. Backend genera embedding de la foto, lo compara contra los embeddings almacenados
-   de la persona vinculada al token. Si la distancia es menor al threshold, verifica.
+Flujos:
+
+1. Registro facial (POST /api/auth/register):
+   - Usuario completa formulario (nombre, apellido, email, password) + 4+ fotos
+   - Backend crea usuario en Keycloak, crea persona, genera embeddings faciales
+   - Retorna exito con datos de la persona
+
+2. Login facial (POST /api/auth/login/facial):
+   - Usuario se toma una foto (webcam o archivo)
+   - Backend genera embedding, compara contra la BD
+   - Si hay coincidencia, obtiene un token JWT de Keycloak y lo retorna
+
+3. Verificacion facial como segundo factor (POST /api/auth/verify-face):
+   - Usuario ya autenticado con Keycloak, verifica su rostro como 2FA
 """
 
 import os
-import json
 import base64
 import io
 import logging
+import secrets
+from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -23,7 +30,7 @@ from typing import Optional
 from ..services.db_service import db_service
 from ..services.auth import verify_token
 from ..services.image_utils import validate_image, get_format_and_mime
-from ..schemas.face import FaceEmbedUploadRequest
+from ..services.keycloak_admin import create_keycloak_user, assign_realm_role_to_user, get_user_token
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +52,37 @@ class FaceVerifyResponse(BaseModel):
     person_id: Optional[str] = Field(None, description="ID de la persona verificada")
     nombre: Optional[str] = Field(None, description="Nombre de la persona verificada")
     apellido: Optional[str] = Field(None, description="Apellido de la persona verificada")
+
+
+class RegisterFaceRequest(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=255)
+    apellido: str = Field(..., min_length=1, max_length=255)
+    email: str = Field(..., max_length=255)
+    password: str = Field(..., min_length=6, max_length=255)
+    images: list[str] = Field(..., min_length=4, max_length=10, description="Lista de 4-10 fotos en base64")
+
+
+class RegisterFaceResponse(BaseModel):
+    person_id: str
+    nombre: str
+    apellido: str
+    email: str
+    message: str
+
+
+class FacialLoginRequest(BaseModel):
+    image_base64: str = Field(..., description="Foto del rostro en base64")
+    threshold: float = Field(0.8, ge=0.0, le=1.0)
+
+
+class FacialLoginResponse(BaseModel):
+    access_token: str = ""
+    token_type: str = "bearer"
+    expires_in: int = 0
+    scope: str = ""
+    person_id: Optional[str] = None
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
 
 
 @router.post("/verify-face", response_model=FaceVerifyResponse)
@@ -189,3 +227,210 @@ async def verify_face(request: FaceVerifyRequest, auth_data: dict = Depends(veri
             nombre=person.get("nombre"),
             apellido=person.get("apellido"),
         )
+
+
+def _generate_embedding(image_base64: str) -> list[float]:
+    inference_url = os.getenv("INFERENCE_SERVER_URL", "http://localhost:8001")
+    image_bytes = base64.b64decode(image_base64.split(",")[-1])
+    if not validate_image(image_bytes):
+        raise HTTPException(status_code=400, detail="La imagen no es valida")
+    _, mime_type = get_format_and_mime(image_bytes)
+    import requests as http_requests
+    resp = http_requests.post(
+        f"{inference_url}/face/embed",
+        files={"image": ("face." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
+        timeout=120
+    )
+    result = resp.json()
+    if result.get("error") or resp.status_code >= 400:
+        raise HTTPException(status_code=502, detail="No se detecto un rostro en la imagen")
+    embedding = result.get("embedding", result.get("embeddings", [None])[0])
+    if not embedding:
+        raise HTTPException(status_code=502, detail="El inference-server no devolvio un embedding valido")
+    return embedding
+
+
+def _embedding_to_str(embedding: list[float]) -> str:
+    return "[" + ",".join(str(v) for v in embedding) + "]"
+
+
+@router.post("/register", response_model=RegisterFaceResponse)
+async def register_face(request: RegisterFaceRequest):
+    """
+    Registra un nuevo usuario con autenticacion facial.
+
+    POST /api/auth/register
+
+    Crea el usuario en Keycloak, la persona en la BD,
+    y genera embeddings faciales para cada foto.
+    Requiere al menos 4 fotos desde distintos angulos.
+    """
+    name = f"{request.nombre} {request.apellido}"
+    person_id = str(uuid4())
+    keycloak_password = request.password
+
+    # 1. Crear usuario en Keycloak
+    try:
+        keycloak_user_id = create_keycloak_user(
+            username=request.email,
+            email=request.email,
+            password=keycloak_password,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        logger.exception("Error creando usuario en Keycloak")
+        raise HTTPException(status_code=502, detail=f"Error creando usuario en Keycloak: {str(e)}")
+
+    # 2. Asignar rol viewer por defecto
+    try:
+        assign_realm_role_to_user(keycloak_user_id, "viewer")
+    except Exception as e:
+        logger.warning("No se pudo asignar rol viewer: %s", e)
+
+    # 3. Crear persona en BD
+    saved = db_service.create_person(
+        person_id=person_id,
+        name=name,
+        email=request.email,
+        metadata={},
+        keycloak_user_id=keycloak_user_id,
+        auth_password=keycloak_password,
+    )
+    if not saved:
+        raise HTTPException(status_code=500, detail="Error creando persona en BD")
+
+    # 4. Generar embeddings para cada foto
+    valid_count = 0
+    conn = db_service.get_connection()
+    try:
+        from psycopg2.extras import RealDictCursor
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        for idx, image_b64 in enumerate(request.images):
+            try:
+                embedding = _generate_embedding(image_b64)
+                image_url = ""
+                try:
+                    from ..services.seaweedfs_client import seaweedfs_client
+                    _, img_mime = get_format_and_mime(base64.b64decode(image_b64.split(",")[-1]))
+                    image_url = seaweedfs_client.upload_image(
+                        image_b64, f"face_{person_id}_{uuid4()}", mime_type=img_mime
+                    )
+                except Exception:
+                    pass
+                embedding_id = str(uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO face_embeddings (embedding_id, person_id, embedding, confidence, image_url)
+                    VALUES (%s, %s, %s::vector, %s, %s)
+                    """,
+                    (embedding_id, person_id, _embedding_to_str(embedding), 0.9, image_url),
+                )
+                if idx == 0 and image_url:
+                    cursor.execute(
+                        "UPDATE persons SET profile_image_url = %s, updated_at = NOW() WHERE person_id = %s",
+                        (image_url, person_id),
+                    )
+                valid_count += 1
+            except HTTPException:
+                continue
+            except Exception as e:
+                logger.warning("Error procesando imagen %d: %s", idx, e)
+                continue
+        conn.commit()
+        cursor.close()
+    finally:
+        conn.close()
+
+    if valid_count == 0:
+        raise HTTPException(status_code=400, detail="Ninguna foto contenia un rostro detectable")
+
+    return RegisterFaceResponse(
+        person_id=person_id,
+        nombre=request.nombre,
+        apellido=request.apellido,
+        email=request.email,
+        message=f"Registro exitoso. {valid_count} rostro(s) procesado(s) correctamente.",
+    )
+
+
+@router.post("/login/facial", response_model=FacialLoginResponse)
+async def login_facial(request: FacialLoginRequest):
+    """
+    Inicia sesion mediante reconocimiento facial.
+
+    POST /api/auth/login/facial
+
+    Recibe una foto, la procesa con el inference-server,
+    busca la persona mas cercana en la BD, y si coincide,
+    genera un token JWT de Keycloak para esa persona.
+    """
+    # 1. Generar embedding de la foto
+    try:
+        embedding = _generate_embedding(request.image_base64)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error procesando imagen: {str(e)}")
+
+    # 2. Buscar la persona mas cercana en la BD
+    embedding_str = _embedding_to_str(embedding)
+    conn = db_service.get_connection()
+    try:
+        from psycopg2.extras import RealDictCursor
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            """
+            SELECT fe.embedding_id::TEXT,
+                   p.person_id::TEXT,
+                   p.name,
+                   p.email,
+                   fe.confidence,
+                   fe.embedding <=> %s::vector AS distance
+            FROM face_embeddings fe
+            JOIN persons p ON p.person_id = fe.person_id
+            WHERE fe.embedding <=> %s::vector < %s
+            ORDER BY distance ASC
+            LIMIT 1
+            """,
+            (embedding_str, embedding_str, 2.0 - request.threshold),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+    finally:
+        conn.close()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="Rostro no reconocido")
+
+    distance = row["distance"]
+    confidence = max(0.0, 1.0 - distance)
+    if confidence < request.threshold:
+        raise HTTPException(status_code=401, detail="Rostro no reconocido con suficiente confianza")
+
+    # 3. Obtener la password almacenada para generar token Keycloak
+    person_id = row["person_id"]
+    auth_password = db_service.get_auth_password(person_id)
+    if not auth_password:
+        raise HTTPException(status_code=500, detail="Error interno: password de autenticacion no encontrada")
+
+    email = row.get("email", "")
+    try:
+        token_data = get_user_token(email, auth_password)
+    except Exception as e:
+        logger.exception("Error obteniendo token de Keycloak")
+        raise HTTPException(status_code=502, detail=f"Error obteniendo token de autenticacion: {str(e)}")
+
+    name_parts = row["name"].split(" ", 1)
+    nombre = name_parts[0]
+    apellido = name_parts[1] if len(name_parts) > 1 else ""
+
+    return FacialLoginResponse(
+        access_token=token_data.get("access_token", ""),
+        token_type=token_data.get("token_type", "bearer"),
+        expires_in=token_data.get("expires_in", 0),
+        scope=token_data.get("scope", ""),
+        person_id=person_id,
+        nombre=nombre,
+        apellido=apellido,
+    )

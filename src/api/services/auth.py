@@ -27,6 +27,8 @@ PUBLIC_PATHS = [
     "/metrics",
     "/nginx-health",
     "/api/face-recognition",
+    "/api/auth/register",
+    "/api/auth/login/facial",
 ]
 
 # Rutas internas que no requieren autenticacion cuando la llamada

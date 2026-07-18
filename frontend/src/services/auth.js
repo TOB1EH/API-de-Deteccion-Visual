@@ -115,15 +115,32 @@ export const authService = {
         authState.token = keycloak.token
         authState.user = extractUserFromToken(keycloak.token)
         console.log('[Keycloak] user from token:', authState.user)
+        authState.authenticated = true
+        authState.loading = false
+        return
       }
-      authState.authenticated = authenticated
-      authState.loading = false
-      console.log('[Keycloak] authState after init:', { ...authState, token: authState.token?.substring(0, 20) + '...' })
     } catch (err) {
-      console.error('[Keycloak] Error critico en init:', err)
-      authState.loading = false
-      authState.authenticated = false
+      console.error('[Keycloak] init fallo, revisando token facial:', err.message)
     }
+    const storedToken = localStorage.getItem('facial_token')
+    if (storedToken) {
+      try {
+        const payload = JSON.parse(atob(storedToken.split('.')[1]))
+        if (payload.exp * 1000 > Date.now()) {
+          authState.token = storedToken
+          authState.user = extractUserFromToken(storedToken)
+          authState.authenticated = true
+          authState.loading = false
+          console.log('[Auth] Sesion iniciada con token facial')
+          return
+        }
+        localStorage.removeItem('facial_token')
+      } catch {
+        localStorage.removeItem('facial_token')
+      }
+    }
+    authState.authenticated = false
+    authState.loading = false
   },
 
   login() {
@@ -137,6 +154,15 @@ export const authService = {
     keycloak.login({ redirectUri: window.location.origin + '/home', idpHint: idpAlias })
   },
 
+  setToken(token) {
+    localStorage.setItem('facial_token', token)
+    authState.token = token
+    authState.user = extractUserFromToken(token)
+    authState.authenticated = true
+    authState.isDemoMode = false
+    authState.loading = false
+  },
+
   enableDemoMode() {
     authState.authenticated = true
     authState.isDemoMode = true
@@ -146,10 +172,16 @@ export const authService = {
 
   logout() {
     const wasDemo = authState.isDemoMode
+    const wasFacial = !!localStorage.getItem('facial_token')
     authState.authenticated = false
     authState.isDemoMode = false
     authState.token = null
     authState.user = null
+    localStorage.removeItem('facial_token')
+    if (wasFacial) {
+      window.location.href = '/login'
+      return
+    }
     if (!wasDemo) {
       keycloak.logout({ redirectUri: window.location.origin + '/login' })
     }

@@ -122,6 +122,16 @@ export async function recognizeFaceFromImage(imageBase64, threshold = 0.8) {
   return data
 }
 
+export async function registerFace(payload) {
+  const { data } = await api.post('/auth/register', payload)
+  return data
+}
+
+export async function facialLogin(payload) {
+  const { data } = await api.post('/auth/login/facial', payload)
+  return data
+}
+
 export function getFrameImageUrl(frameId, thumbnail = false) {
   const baseURL = isLocalDev
     ? 'http://localhost:8000/api/'

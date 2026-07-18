@@ -30,6 +30,16 @@ const routes = [
     component: () => import('../views/LoginView.vue')
   },
   {
+    path: '/registro-facial',
+    name: 'RegisterFace',
+    component: () => import('../views/RegisterFaceView.vue')
+  },
+  {
+    path: '/login-facial',
+    name: 'FaceLogin',
+    component: () => import('../views/FaceLoginView.vue')
+  },
+  {
     // Cargar imagen: solo admin y operator pueden procesar imagenes
     path: '/cargar',
     name: 'Cargar',
@@ -106,8 +116,8 @@ router.beforeEach((to, from, next) => {
     next()
     return
   }
-  // La pagina de login siempre es accesible
-  if (to.path === '/login') {
+  // Las paginas de login y registro facial siempre son accesibles
+  if (to.path === '/login' || to.path === '/registro-facial' || to.path === '/login-facial') {
     next()
     return
   }

@@ -459,16 +459,18 @@ class DatabaseService:
 
     def create_person(self, person_id: str, name: str, email: str = None,
                       metadata: dict = None,
-                      keycloak_user_id: str = None) -> bool:
+                      keycloak_user_id: str = None,
+                      auth_password: str = None) -> bool:
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
             query = """
-            INSERT INTO persons (person_id, name, email, keycloak_user_id, metadata)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO persons (person_id, name, email, keycloak_user_id, metadata, auth_password)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
             cursor.execute(query, (person_id, name, email, keycloak_user_id,
-                                   json.dumps(metadata) if metadata else None))
+                                   json.dumps(metadata) if metadata else None,
+                                   auth_password))
             conn.commit()
             cursor.close()
             conn.close()
@@ -476,6 +478,19 @@ class DatabaseService:
         except Exception as e:
             logger.error("Error creando persona: %s", e)
             return False
+
+    def get_auth_password(self, person_id: str) -> Optional[str]:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT auth_password FROM persons WHERE person_id = %s", (person_id,))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return row[0] if row else None
+        except Exception as e:
+            logger.error("Error obteniendo auth_password: %s", e)
+            return None
 
     def update_profile_image(self, person_id: str, image_url: str) -> bool:
         try:
