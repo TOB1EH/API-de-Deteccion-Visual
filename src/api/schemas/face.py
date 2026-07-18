@@ -32,6 +32,7 @@ class FaceRecognizeResponse(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
     confidence: float = 0.0
+    image_url: Optional[str] = None
 
 
 class FaceEmbedUploadRequest(BaseModel):

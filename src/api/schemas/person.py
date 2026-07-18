@@ -17,6 +17,7 @@ class PersonResponse(BaseModel):
     email: Optional[str] = None
     keycloak_user_id: Optional[str] = None
     has_faces: bool = False
+    profile_image_url: str = ""
     metadata: Optional[dict[str, Any]] = None
     created_at: str
     updated_at: str
@@ -26,6 +27,7 @@ class PersonUpdate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=255)
     apellido: str = Field(..., min_length=1, max_length=255)
     email: Optional[str] = Field(None, max_length=255)
+    profile_image_url: Optional[str] = None
     metadata: Optional[dict[str, Any]] = None
 
 

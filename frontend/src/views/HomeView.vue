@@ -222,8 +222,7 @@ function goToModel(modelName) {
 
 onMounted(async () => {
   // Cada llamada se maneja por separado para que el error de una no
-  // bloquee las otras. Los servicios tienen fallback a mock interno,
-  // pero si el token no tiene permisos (403) igualmente se usa mock.
+  // bloquee las otras.
   const [modelsData, personsData, framesData] = await Promise.allSettled([
     getModels(),
     getPersons(),
