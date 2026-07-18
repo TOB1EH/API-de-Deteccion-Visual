@@ -19,6 +19,12 @@ const routes = [
     component: () => import('../views/HomeView.vue')
   },
   {
+    path: '/monitoreo',
+    name: 'Monitoreo',
+    component: () => import('../views/MonitoreoView.vue'),
+    meta: { roles: ['admin', 'operator'] }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginView.vue')
@@ -78,11 +84,6 @@ const routes = [
     component: () => import('../views/FaceVerifyView.vue'),
     meta: { roles: ['admin', 'operator'] }
   },
-  {
-    path: '/monitoreo',
-    name: 'Monitoreo',
-    component: () => import('../views/MonitoreoView.vue')
-  }
 ]
 
 const router = createRouter({

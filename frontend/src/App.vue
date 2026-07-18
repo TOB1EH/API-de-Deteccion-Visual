@@ -98,7 +98,7 @@ const allNavItems = [
   { to: '/buscar', icon: 'mdi-magnify', label: 'Buscar' },
   { to: '/personas', icon: 'mdi-account-group', label: 'Personas', roles: ['admin', 'operator'] },
   { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial', roles: ['admin'] },
-  { to: '/monitoreo', icon: 'mdi-monitor-dashboard', label: 'NOC' }
+  { to: '/monitoreo', icon: 'mdi-monitor-dashboard', label: 'NOC', roles: ['admin', 'operator'] }
 ]
 
 // Filtramos los items de navegacion segun los roles del usuario autenticado:

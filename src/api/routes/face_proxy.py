@@ -2,6 +2,7 @@ import json
 import logging
 import base64
 import os
+import time
 from uuid import uuid4
 from typing import Optional
 from io import BytesIO
@@ -22,6 +23,7 @@ from ..schemas.face import (
 from ..services.db_service import db_service
 from ..services.seaweedfs_client import seaweedfs_client
 from ..services.db_service import DatabaseService
+from ..routes.metrics import EMBEDDING_TIME, COMPARISON_TIME, RECOGNITION_COUNT
 from ..services.auth import require_role, verify_token
 from ..services.image_utils import validate_image, get_format_and_mime
 
@@ -74,12 +76,14 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
         conn.close()
 
     # Enviar al inference-server
+    embed_start = time.time()
     resp = http_requests.post(
         f"{inference_url}/face/embed",
         data={"person_id": person_id},
         files={"image": ("face." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
         timeout=120
     )
+    EMBEDDING_TIME.observe(time.time() - embed_start)
 
     try:
         result = resp.json()
@@ -167,6 +171,7 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
 @router.post("/face-recognition", response_model=FaceRecognizeResponse)
 async def recognize_face(request: FaceRecognizeRequest):
     try:
+        compare_start = time.time()
         conn = db_service.get_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
@@ -188,15 +193,19 @@ async def recognize_face(request: FaceRecognizeRequest):
         row = cursor.fetchone()
         cursor.close()
         conn.close()
+        COMPARISON_TIME.observe(time.time() - compare_start)
 
         if not row:
+            RECOGNITION_COUNT.labels(result="failure").inc()
             return FaceRecognizeResponse()
 
         distance = row["distance"]
         conf = max(0.0, 1.0 - distance)
         if conf < request.threshold:
+            RECOGNITION_COUNT.labels(result="failure").inc()
             return FaceRecognizeResponse()
 
+        RECOGNITION_COUNT.labels(result="success").inc()
         name_parts = DatabaseService._name_to_parts(row["name"])
         return FaceRecognizeResponse(
             person_id=row["person_id"],
