@@ -147,6 +147,13 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
             """,
             (embedding_id, person_id, _embedding_to_str(request.embedding), request.confidence, image_url or ""),
         )
+
+        if image_url:
+            cursor.execute(
+                "UPDATE persons SET profile_image_url = COALESCE(NULLIF(profile_image_url, ''), %s), updated_at = NOW() WHERE person_id = %s",
+                (image_url, person_id),
+            )
+
         conn.commit()
         cursor.close()
         conn.close()
@@ -181,6 +188,7 @@ async def recognize_face(request: FaceRecognizeRequest):
                    p.person_id::TEXT,
                    p.name,
                    fe.confidence,
+                   p.profile_image_url,
                    fe.embedding <=> %s::vector AS distance
             FROM face_embeddings fe
             JOIN persons p ON p.person_id = fe.person_id
@@ -207,11 +215,13 @@ async def recognize_face(request: FaceRecognizeRequest):
 
         RECOGNITION_COUNT.labels(result="success").inc()
         name_parts = DatabaseService._name_to_parts(row["name"])
+        image_url = row.get("profile_image_url") or ""
         return FaceRecognizeResponse(
             person_id=row["person_id"],
             nombre=name_parts["nombre"],
             apellido=name_parts["apellido"],
             confidence=round(conf, 4),
+            image_url=image_url,
         )
 
     except Exception as e:
@@ -263,4 +273,5 @@ async def recognize_face_from_image(request: FaceRecognizeFromImageRequest):
         nombre=result.get("nombre"),
         apellido=result.get("apellido"),
         confidence=result.get("confidence", 0.0),
+        image_url=result.get("image_url"),
     )

@@ -75,10 +75,22 @@
     <v-col v-if="selectedPerson" cols="12">
       <v-card class="pa-5" color="primary" variant="tonal" border="start">
         <div class="d-flex align-center">
-          <v-avatar color="primary" size="48" class="mr-4">
-            <span class="text-h5 font-weight-bold text-white">
+          <v-avatar color="primary" size="56" class="mr-4" @click="triggerProfileUpload">
+            <v-img
+              v-if="selectedPerson.profile_image_url"
+              :src="selectedPerson.profile_image_url"
+              class="cursor-pointer"
+              style="cursor: pointer;"
+            />
+            <span v-else class="text-h5 font-weight-bold text-white cursor-pointer">
               {{ selectedPerson.nombre?.charAt(0) }}{{ selectedPerson.apellido?.charAt(0) }}
             </span>
+            <v-icon
+              v-if="isAdmin()"
+              class="profile-overlay"
+              size="20"
+              color="white"
+            >mdi-camera</v-icon>
           </v-avatar>
           <div class="flex-grow-1">
             <div class="text-h6 font-weight-bold">{{ selectedPerson.nombre }} {{ selectedPerson.apellido }}</div>
@@ -138,6 +150,13 @@
             multiple
             style="display: none"
             @change="onFacesSelected"
+          />
+          <input
+            ref="profileInput"
+            type="file"
+            accept="image/*"
+            style="display: none"
+            @change="onProfileSelected"
           />
         </div>
         <v-alert
@@ -220,6 +239,7 @@ const dialog = ref(false)
 const editingPerson = ref(null)
 const selectedPerson = ref(null)
 const facesInput = ref(null)
+const profileInput = ref(null)
 const uploading = ref(false)
 const uploadMsg = ref('')
 const uploadError = ref(false)
@@ -328,6 +348,53 @@ function triggerFacesUpload() {
   facesInput.value?.click()
 }
 
+function triggerProfileUpload() {
+  if (!isAdmin()) return
+  profileInput.value?.click()
+}
+
+async function onProfileSelected(e) {
+  const file = e.target.files?.[0]
+  if (!file || !selectedPerson.value) return
+
+  uploading.value = true
+  uploadMsg.value = 'Subiendo foto de perfil...'
+  uploadError.value = false
+
+  try {
+    let result
+    if (hasLocalServer.value) {
+      result = await localFaceEmbed(selectedPerson.value.person_id, file, authState.token)
+    } else {
+      const image_base64 = await fileToBase64(file)
+      result = await postFaceEmbed(selectedPerson.value.person_id, {
+        image_base64,
+        confidence: 0.8
+      })
+    }
+    if (result.valid_embeddings > 0) {
+      uploadMsg.value = 'Foto de perfil establecida correctamente'
+      uploadError.value = false
+      const updated = await getPersons()
+      const found = updated.persons?.find(p => p.person_id === selectedPerson.value.person_id)
+      if (found) {
+        selectedPerson.value = found
+        const idx = persons.value.findIndex(p => p.person_id === found.person_id)
+        if (idx !== -1) persons.value[idx] = found
+      }
+    } else {
+      uploadMsg.value = 'No se pudo procesar la imagen'
+      uploadError.value = true
+    }
+  } catch {
+    uploadMsg.value = 'Error al subir foto de perfil'
+    uploadError.value = true
+  }
+
+  uploading.value = false
+  e.target.value = ''
+}
+
 async function onFacesSelected(e) {
   const files = e.target.files
   if (!files?.length || !selectedPerson.value) return
@@ -389,5 +456,19 @@ async function onFacesSelected(e) {
 }
 .person-row-selected {
   background: rgba(var(--v-theme-primary), 0.06) !important;
+}
+.v-avatar {
+  position: relative;
+}
+.profile-overlay {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  padding: 4px;
+}
+.cursor-pointer {
+  cursor: pointer;
 }
 </style>

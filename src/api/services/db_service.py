@@ -391,7 +391,8 @@ class DatabaseService:
             return []
 
     def update_person(self, person_id: str, name: str, email: str = None,
-                      metadata: dict = None) -> bool:
+                      metadata: dict = None,
+                      profile_image_url: str = None) -> bool:
         """
         Actualiza los datos de una persona existente en la base de datos.
 
@@ -409,11 +410,14 @@ class DatabaseService:
             cursor = conn.cursor()
             query = """
             UPDATE persons
-            SET name = %s, email = %s, metadata = %s, updated_at = NOW()
+            SET name = %s, email = %s, metadata = %s,
+                profile_image_url = COALESCE(%s, profile_image_url),
+                updated_at = NOW()
             WHERE person_id = %s
             """
             cursor.execute(query, (name, email,
                                    json.dumps(metadata) if metadata else None,
+                                   profile_image_url,
                                    person_id))
             conn.commit()
             success = cursor.rowcount > 0
@@ -473,6 +477,23 @@ class DatabaseService:
             logger.error("Error creando persona: %s", e)
             return False
 
+    def update_profile_image(self, person_id: str, image_url: str) -> bool:
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE persons SET profile_image_url = %s, updated_at = NOW() WHERE person_id = %s",
+                (image_url, person_id),
+            )
+            conn.commit()
+            success = cursor.rowcount > 0
+            cursor.close()
+            conn.close()
+            return success
+        except Exception as e:
+            logger.error("Error actualizando foto de perfil: %s", e)
+            return False
+
     @staticmethod
     def _name_to_parts(name: str) -> dict:
         parts = name.strip().split(" ", 1)
@@ -485,6 +506,7 @@ class DatabaseService:
             query = """
             SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
                    p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   p.profile_image_url,
                    (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
             FROM persons p
             WHERE p.person_id = %s
@@ -514,6 +536,7 @@ class DatabaseService:
             query = """
             SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
                    p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   p.profile_image_url,
                    (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
             FROM persons p
             WHERE p.keycloak_user_id = %s
@@ -540,6 +563,7 @@ class DatabaseService:
             query = """
             SELECT p.person_id::TEXT, p.name, p.email, p.keycloak_user_id,
                    p.metadata, p.created_at::TEXT, p.updated_at::TEXT,
+                   p.profile_image_url,
                    (SELECT COUNT(*) > 0 FROM face_embeddings fe WHERE fe.person_id = p.person_id) AS has_faces
             FROM persons p
             ORDER BY p.name ASC

@@ -173,7 +173,6 @@ COMMENT ON INDEX idx_face_embeddings_ivfflat IS 'Búsqueda aproximada de rostros
 
 -- ============================================================================
 -- MIGRACION: Agregar columna keycloak_user_id a tabla persons existentes
--- Usa DO bloque para evitar error si la columna ya existe
 -- ============================================================================
 DO $$
 BEGIN
@@ -183,6 +182,21 @@ BEGIN
     ) THEN
         ALTER TABLE persons ADD COLUMN keycloak_user_id VARCHAR(255);
         COMMENT ON COLUMN persons.keycloak_user_id IS 'ID del usuario de Keycloak vinculado a esta persona (sub del token JWT)';
+    END IF;
+END $$;
+
+-- ============================================================================
+-- MIGRACION: Agregar columna profile_image_url a tabla persons
+-- Almacena la URL de SeaweedFS de la foto de perfil de la persona
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'persons' AND column_name = 'profile_image_url'
+    ) THEN
+        ALTER TABLE persons ADD COLUMN profile_image_url TEXT DEFAULT '';
+        COMMENT ON COLUMN persons.profile_image_url IS 'URL de la foto de perfil de la persona en SeaweedFS';
     END IF;
 END $$;
 

@@ -48,7 +48,8 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
             keycloak_user_id=keycloak_user_id,
             metadata=request.metadata or {},
             created_at=timestamp,
-            updated_at=timestamp
+            updated_at=timestamp,
+            profile_image_url="",
         )
 
     except HTTPException:
@@ -94,7 +95,8 @@ async def update_person(person_id: str, request: PersonUpdate):
             person_id=person_id,
             name=name,
             email=request.email,
-            metadata=request.metadata
+            metadata=request.metadata,
+            profile_image_url=request.profile_image_url,
         )
 
         if not updated:
@@ -110,6 +112,7 @@ async def update_person(person_id: str, request: PersonUpdate):
             email=request.email,
             keycloak_user_id=existing.get("keycloak_user_id"),
             has_faces=existing.get("has_faces", False),
+            profile_image_url=request.profile_image_url or existing.get("profile_image_url", ""),
             metadata=request.metadata or {},
             created_at=existing["created_at"],
             updated_at=timestamp
