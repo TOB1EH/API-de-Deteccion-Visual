@@ -221,7 +221,7 @@ function resetFilters() {
 
 // Ejecuta la busqueda contra el backend con todos los filtros activos.
 // Incluye los nuevos filtros camera_id y source en los parametros enviados.
-// El mock de api.js ya filtra localmente estos campos si la API no responde.
+// La API filtra por estos campos en el backend.
 async function doSearch() {
   searched.value = true
   loading.value = true
