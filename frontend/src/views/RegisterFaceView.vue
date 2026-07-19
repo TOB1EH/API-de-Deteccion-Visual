@@ -155,22 +155,26 @@ async function handleRegister() {
 
     let successCount = 0
     let failCount = 0
-    for (let idx = 0; idx < photos.value.length; idx++) {
-      const photo = photos.value[idx]
-      const blob = await fetch(photo.url).then(r => r.blob())
-      try {
-        await localFaceEmbed(personId, blob, token)
-        successCount++
-      } catch {
-        failCount++
+    if (token) {
+      for (let idx = 0; idx < photos.value.length; idx++) {
+        const photo = photos.value[idx]
+        const blob = await fetch(photo.url).then(r => r.blob())
+        try {
+          await localFaceEmbed(personId, blob, token)
+          successCount++
+        } catch {
+          failCount++
+        }
       }
     }
 
-    if (successCount === 0) {
-      throw new Error('Ninguna foto pudo ser procesada. Verifica que el inference-server local tenga DeepFace.')
+    if (successCount > 0) {
+      successMsg.value = `Registro exitoso! ${successCount} rostro(s) procesado(s).`
+    } else if (personId) {
+      successMsg.value = `Registro exitoso! No se pudieron enviar las fotos. Inicia sesion y subilas desde Personas > ${regResult.nombre}.`
+    } else {
+      throw new Error('Error al crear la cuenta')
     }
-
-    successMsg.value = `Registro exitoso! ${successCount} rostro(s) procesado(s).`
     setTimeout(() => router.push('/login'), 2000)
   } catch (err) {
     const detail = err.response?.data?.detail

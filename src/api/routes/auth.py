@@ -274,12 +274,17 @@ async def register_face(request: RegisterFaceRequest):
         )
         if not saved:
             raise Exception("Error al crear persona en BD")
-
-        token_data = get_user_token(request.email, keycloak_password)
     except Exception as e:
         logger.exception("Error en registro, realizando rollback de Keycloak user")
         delete_keycloak_user(keycloak_user_id)
         raise HTTPException(status_code=500, detail=str(e))
+
+    token = ""
+    try:
+        token_data = get_user_token(request.email, keycloak_password)
+        token = token_data.get("access_token", "")
+    except Exception as e:
+        logger.warning("No se pudo obtener token JWT para el registro: %s", e)
 
     return RegisterFaceResponse(
         person_id=person_id,
@@ -287,8 +292,8 @@ async def register_face(request: RegisterFaceRequest):
         apellido=request.apellido,
         email=request.email,
         message="Registro exitoso. Enviando fotos faciales al inference-server local.",
-        access_token=token_data.get("access_token", ""),
-        token_type=token_data.get("token_type", "bearer"),
+        access_token=token,
+        token_type="bearer",
     )
 
 
