@@ -237,13 +237,14 @@ def _generate_embedding(image_base64: str) -> list[float]:
     _, mime_type = get_format_and_mime(image_bytes)
     import requests as http_requests
     resp = http_requests.post(
-        f"{inference_url}/face/embed",
+        f"{inference_url}/face/detect",
         files={"image": ("face." + mime_type.split("/")[-1], io.BytesIO(image_bytes), mime_type)},
         timeout=120
     )
     result = resp.json()
-    if result.get("error") or resp.status_code >= 400:
-        raise HTTPException(status_code=502, detail="No se detecto un rostro en la imagen")
+    if resp.status_code >= 400 or result.get("error"):
+        detail = result.get("detail") or result.get("error") or "No se detecto un rostro en la imagen"
+        raise HTTPException(status_code=502, detail=detail)
     embedding = result.get("embedding", result.get("embeddings", [None])[0])
     if not embedding:
         raise HTTPException(status_code=502, detail="El inference-server no devolvio un embedding valido")
