@@ -24,6 +24,11 @@
           {{ successMsg }}
         </v-alert>
 
+        <v-alert v-if="step === 'uploading'" type="info" variant="tonal" class="mb-4">
+          <v-icon start>mdi-loading mdi-spin</v-icon>
+          Enviando fotos al servidor local de reconocimiento facial...
+        </v-alert>
+
         <v-form @submit.prevent="handleRegister">
           <v-row>
             <v-col cols="6">
@@ -91,7 +96,8 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { registerFace } from '../services/api'
-import { localFaceDetect, checkLocalServer } from '../services/inference'
+import { localFaceEmbed, checkLocalServer } from '../services/inference'
+import { authState } from '../services/auth'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -99,6 +105,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 const photos = ref([])
+const step = ref('form')
 
 const form = reactive({
   nombre: '',
@@ -116,19 +123,9 @@ async function onFilesSelected(e) {
   for (const file of files) {
     if (photos.value.length >= 10) break
     const url = URL.createObjectURL(file)
-    const b64 = await fileToBase64Raw(file)
-    photos.value.push({ file, url, b64, embedding: null })
+    photos.value.push({ file, url })
   }
   e.target.value = ''
-}
-
-function fileToBase64Raw(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result.split(',')[1])
-    reader.onerror = () => reject(new Error('Error al leer la imagen'))
-    reader.readAsDataURL(file)
-  })
 }
 
 async function handleRegister() {
@@ -142,26 +139,37 @@ async function handleRegister() {
       throw new Error('El servidor de reconocimiento facial local no esta corriendo en http://localhost:8001')
     }
 
-    const embeddings = []
-    for (let idx = 0; idx < photos.value.length; idx++) {
-      const photo = photos.value[idx]
-      const blob = await fetch(photo.url).then(r => r.blob())
-      const result = await localFaceDetect(blob)
-      if (!result.embedding) {
-        throw new Error(`Foto ${idx + 1}: no se detecto un rostro. Asegurate de que todas las fotos muestren tu rostro claramente.`)
-      }
-      embeddings.push(result.embedding)
+    if (photos.value.length < 4) {
+      throw new Error('Se requieren al menos 4 fotos del rostro')
     }
 
-    const result = await registerFace({
+    const regResult = await registerFace({
       nombre: form.nombre,
       apellido: form.apellido,
       email: form.email,
       password: form.password,
-      images: photos.value.map(p => p.b64),
-      embeddings: embeddings
     })
-    successMsg.value = result.message || 'Registro exitoso!'
+    const personId = regResult.person_id
+    step.value = 'uploading'
+
+    let successCount = 0
+    let failCount = 0
+    for (let idx = 0; idx < photos.value.length; idx++) {
+      const photo = photos.value[idx]
+      const blob = await fetch(photo.url).then(r => r.blob())
+      try {
+        await localFaceEmbed(personId, blob, null)
+        successCount++
+      } catch {
+        failCount++
+      }
+    }
+
+    if (successCount === 0) {
+      throw new Error('Ninguna foto pudo ser procesada. Verifica que el inference-server local tenga DeepFace.')
+    }
+
+    successMsg.value = `Registro exitoso! ${successCount} rostro(s) procesado(s).`
     setTimeout(() => router.push('/login'), 2000)
   } catch (err) {
     const detail = err.response?.data?.detail

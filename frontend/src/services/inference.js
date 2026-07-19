@@ -31,14 +31,3 @@ export async function localFaceEmbed(personId, imageBlob, token) {
   if (!res.ok) throw new Error(`Face embed error: ${res.status}`)
   return res.json()
 }
-
-export async function localFaceDetect(imageBlob) {
-  const form = new FormData()
-  form.append('image', imageBlob)
-  const res = await fetch(`${LOCAL_INFER_URL}/face/detect`, { method: 'POST', body: form })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || `Face detect error: ${res.status}`)
-  }
-  return res.json()
-}

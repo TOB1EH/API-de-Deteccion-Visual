@@ -63,7 +63,7 @@ import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { facialLogin } from '../services/api'
 import { authService } from '../services/auth'
-import { localFaceDetect, checkLocalServer } from '../services/inference'
+import { localFaceRecognize, checkLocalServer } from '../services/inference'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -141,14 +141,13 @@ async function handleLogin() {
     }
 
     const blob = imageBlob.value || await (await fetch(imageBase64.value)).blob()
-    const detectResult = await localFaceDetect(blob)
-    if (!detectResult.embedding) {
-      throw new Error('No se detecto un rostro en la imagen')
+    const recognizeResult = await localFaceRecognize(blob, 0.5)
+    if (!recognizeResult.person_id) {
+      throw new Error('Rostro no reconocido')
     }
 
     const result = await facialLogin({
-      image_base64: imageBase64.value,
-      embedding: detectResult.embedding
+      person_id: recognizeResult.person_id
     })
     const token = result.access_token
     if (token) {

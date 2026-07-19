@@ -234,30 +234,6 @@ async def download_annotated_image(image_id: str):
     return FileResponse(file_path, media_type="image/jpeg")
 
 
-@app.post("/face/detect")
-async def face_detect(image: UploadFile = File(...)):
-    if not image.filename:
-        raise HTTPException(status_code=400, detail="Archivo de imagen requerido")
-    temp_path = str(FACE_TEMP_DIR / f"{uuid.uuid4()}_{image.filename}")
-    try:
-        with open(temp_path, "wb") as f:
-            shutil.copyfileobj(image.file, f)
-        emb_result = generate_embedding(temp_path)
-        os.remove(temp_path)
-        if "error" in emb_result:
-            raise HTTPException(status_code=400, detail=emb_result["error"])
-        return emb_result
-    except HTTPException:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise
-    except Exception as e:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        logger.exception("Error en face/detect")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/face/embed")
 async def face_embed(
     person_id: str = Form(...),
