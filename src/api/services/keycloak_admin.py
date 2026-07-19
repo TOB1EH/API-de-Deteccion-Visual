@@ -27,7 +27,38 @@ def _get_admin_token() -> str:
     return resp.json()["access_token"]
 
 
+def find_user_by_email(email: str) -> Optional[str]:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users?email={email}&exact=true",
+        headers=headers,
+        timeout=10,
+    )
+    resp.raise_for_status()
+    users = resp.json()
+    if users:
+        return users[0].get("id")
+    return None
+
+
+def delete_keycloak_user(user_id: str) -> None:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.delete(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code not in (204, 404):
+        logger.warning("Error eliminando usuario Keycloak %s: %s", user_id, resp.status_code)
+
+
 def create_keycloak_user(username: str, email: str, password: str) -> str:
+    existing = find_user_by_email(email)
+    if existing:
+        raise ValueError(f"El usuario {username} ya existe en Keycloak")
+
     token = _get_admin_token()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {
@@ -43,11 +74,11 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
         headers=headers,
         timeout=10,
     )
-    if resp.status_code == 409:
-        raise ValueError(f"El usuario {username} ya existe en Keycloak")
     resp.raise_for_status()
     location = resp.headers.get("Location", "")
     user_id = location.rstrip("/").split("/")[-1] if location else ""
+    if not user_id:
+        return find_user_by_email(email) or ""
     return user_id
 
 

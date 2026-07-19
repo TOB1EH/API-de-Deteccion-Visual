@@ -30,7 +30,7 @@ from typing import Optional
 from ..services.db_service import db_service
 from ..services.auth import verify_token
 from ..services.image_utils import validate_image, get_format_and_mime
-from ..services.keycloak_admin import create_keycloak_user, assign_realm_role_to_user, get_user_token
+from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user, get_user_token
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +269,29 @@ async def register_face(request: RegisterFaceRequest):
     person_id = str(uuid4())
     keycloak_password = request.password
 
-    # 1. Crear usuario en Keycloak
+    # 1. Validar que TODAS las imagenes tengan rostros detectables ANTES de crear Keycloak user
+    valid_embeddings = []
+    for idx, image_b64 in enumerate(request.images):
+        try:
+            embedding = _generate_embedding(image_b64)
+            valid_embeddings.append(embedding)
+        except HTTPException as e:
+            if e.status_code == 502:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Foto {idx + 1}: no se detecto un rostro. Asegurate de que todas las fotos muestren tu rostro claramente."
+                )
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Foto {idx + 1}: error al procesar la imagen: {str(e)}"
+            )
+
+    if len(valid_embeddings) < 4:
+        raise HTTPException(status_code=400, detail="Se requieren al menos 4 fotos con rostros detectables")
+
+    # 2. Crear usuario en Keycloak
     try:
         keycloak_user_id = create_keycloak_user(
             username=request.email,
@@ -277,80 +299,83 @@ async def register_face(request: RegisterFaceRequest):
             password=keycloak_password,
         )
     except ValueError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail="El email ya esta registrado. Inicia sesion o usa otro email.")
     except Exception as e:
         logger.exception("Error creando usuario en Keycloak")
         raise HTTPException(status_code=502, detail=f"Error creando usuario en Keycloak: {str(e)}")
 
-    # 2. Asignar rol viewer por defecto
     try:
-        assign_realm_role_to_user(keycloak_user_id, "viewer")
-    except Exception as e:
-        logger.warning("No se pudo asignar rol viewer: %s", e)
+        # 3. Asignar rol viewer por defecto
+        try:
+            assign_realm_role_to_user(keycloak_user_id, "viewer")
+        except Exception as e:
+            logger.warning("No se pudo asignar rol viewer: %s", e)
 
-    # 3. Crear persona en BD
-    saved = db_service.create_person(
-        person_id=person_id,
-        name=name,
-        email=request.email,
-        metadata={},
-        keycloak_user_id=keycloak_user_id,
-        auth_password=keycloak_password,
-    )
-    if not saved:
-        raise HTTPException(status_code=500, detail="Error creando persona en BD")
+        # 4. Crear persona en BD
+        saved = db_service.create_person(
+            person_id=person_id,
+            name=name,
+            email=request.email,
+            metadata={},
+            keycloak_user_id=keycloak_user_id,
+            auth_password=keycloak_password,
+        )
+        if not saved:
+            raise Exception("Error al crear persona en BD")
 
-    # 4. Generar embeddings para cada foto
-    valid_count = 0
-    conn = db_service.get_connection()
-    try:
-        from psycopg2.extras import RealDictCursor
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        for idx, image_b64 in enumerate(request.images):
-            try:
-                embedding = _generate_embedding(image_b64)
-                image_url = ""
+        # 5. Generar embeddings para cada foto
+        success_count = 0
+        conn = db_service.get_connection()
+        try:
+            from psycopg2.extras import RealDictCursor
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            for idx, image_b64 in enumerate(request.images):
                 try:
-                    from ..services.seaweedfs_client import seaweedfs_client
-                    _, img_mime = get_format_and_mime(base64.b64decode(image_b64.split(",")[-1]))
-                    image_url = seaweedfs_client.upload_image(
-                        image_b64, f"face_{person_id}_{uuid4()}", mime_type=img_mime
-                    )
-                except Exception:
-                    pass
-                embedding_id = str(uuid4())
-                cursor.execute(
-                    """
-                    INSERT INTO face_embeddings (embedding_id, person_id, embedding, confidence, image_url)
-                    VALUES (%s, %s, %s::vector, %s, %s)
-                    """,
-                    (embedding_id, person_id, _embedding_to_str(embedding), 0.9, image_url),
-                )
-                if idx == 0 and image_url:
+                    embedding = valid_embeddings[idx]
+                    image_url = ""
+                    try:
+                        from ..services.seaweedfs_client import seaweedfs_client
+                        _, img_mime = get_format_and_mime(base64.b64decode(image_b64.split(",")[-1]))
+                        image_url = seaweedfs_client.upload_image(
+                            image_b64, f"face_{person_id}_{uuid4()}", mime_type=img_mime
+                        )
+                    except Exception:
+                        pass
+                    embedding_id = str(uuid4())
                     cursor.execute(
-                        "UPDATE persons SET profile_image_url = %s, updated_at = NOW() WHERE person_id = %s",
-                        (image_url, person_id),
+                        """
+                        INSERT INTO face_embeddings (embedding_id, person_id, embedding, confidence, image_url)
+                        VALUES (%s, %s, %s::vector, %s, %s)
+                        """,
+                        (embedding_id, person_id, _embedding_to_str(embedding), 0.9, image_url),
                     )
-                valid_count += 1
-            except HTTPException:
-                continue
-            except Exception as e:
-                logger.warning("Error procesando imagen %d: %s", idx, e)
-                continue
-        conn.commit()
-        cursor.close()
-    finally:
-        conn.close()
+                    if idx == 0 and image_url:
+                        cursor.execute(
+                            "UPDATE persons SET profile_image_url = %s, updated_at = NOW() WHERE person_id = %s",
+                            (image_url, person_id),
+                        )
+                    success_count += 1
+                except Exception as e:
+                    logger.warning("Error guardando embedding %d: %s", idx, e)
+                    continue
+            conn.commit()
+            cursor.close()
+        finally:
+            conn.close()
 
-    if valid_count == 0:
-        raise HTTPException(status_code=400, detail="Ninguna foto contenia un rostro detectable")
+        if success_count == 0:
+            raise Exception("Ningun embedding pudo ser guardado")
+    except Exception as e:
+        logger.exception("Error en registro, realizando rollback de Keycloak user")
+        delete_keycloak_user(keycloak_user_id)
+        raise HTTPException(status_code=500, detail=str(e))
 
     return RegisterFaceResponse(
         person_id=person_id,
         nombre=request.nombre,
         apellido=request.apellido,
         email=request.email,
-        message=f"Registro exitoso. {valid_count} rostro(s) procesado(s) correctamente.",
+        message=f"Registro exitoso. {success_count} rostro(s) procesado(s) correctamente.",
     )
 
 

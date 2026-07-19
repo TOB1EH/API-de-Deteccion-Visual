@@ -115,16 +115,16 @@ async function onFilesSelected(e) {
   for (const file of files) {
     if (photos.value.length >= 10) break
     const url = URL.createObjectURL(file)
-    const b64 = await fileToBase64(file)
+    const b64 = await fileToBase64Raw(file)
     photos.value.push({ file, url, b64 })
   }
   e.target.value = ''
 }
 
-function fileToBase64(file) {
+function fileToBase64Raw(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
+    reader.onload = () => resolve(reader.result.split(',')[1])
     reader.onerror = () => reject(new Error('Error al leer la imagen'))
     reader.readAsDataURL(file)
   })
@@ -142,10 +142,17 @@ async function handleRegister() {
       password: form.password,
       images: photos.value.map(p => p.b64)
     })
-    successMsg.value = result.message || 'Registro exitoso! Redirigiendo al login...'
+    successMsg.value = result.message || 'Registro exitoso!'
     setTimeout(() => router.push('/login'), 2000)
   } catch (err) {
-    errorMsg.value = err.response?.data?.detail || err.message || 'Error al registrarse'
+    const detail = err.response?.data?.detail
+    if (err.response?.status === 409) {
+      errorMsg.value = 'El email ya esta registrado. Inicia sesion o usa otro email.'
+    } else if (err.response?.status === 400 && Array.isArray(detail)) {
+      errorMsg.value = detail.map(d => d.msg).join(', ')
+    } else {
+      errorMsg.value = detail || err.message || 'Error al registrarse'
+    }
   } finally {
     loading.value = false
   }
