@@ -66,6 +66,7 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
         "email": email,
         "emailVerified": True,
         "enabled": True,
+        "requiredActions": [],
         "credentials": [{"type": "password", "value": password, "temporary": False}],
     }
     resp = requests.post(
