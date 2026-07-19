@@ -117,5 +117,7 @@ def get_user_token(email: str, password: str) -> dict:
         },
         timeout=10,
     )
+    if resp.status_code >= 400:
+        logger.error("Keycloak token error %s: %s", resp.status_code, resp.text)
     resp.raise_for_status()
     return resp.json()
