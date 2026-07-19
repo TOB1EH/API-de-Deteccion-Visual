@@ -60,6 +60,7 @@ class RegisterFaceRequest(BaseModel):
     email: str = Field(..., max_length=255)
     password: str = Field(..., min_length=6, max_length=255)
     images: list[str] = Field(..., min_length=4, max_length=10, description="Lista de 4-10 fotos en base64")
+    embeddings: Optional[list[list[float]]] = Field(None, description="Embeddings pre-computados (desde inference-server local)")
 
 
 class RegisterFaceResponse(BaseModel):
@@ -73,6 +74,7 @@ class RegisterFaceResponse(BaseModel):
 class FacialLoginRequest(BaseModel):
     image_base64: str = Field(..., description="Foto del rostro en base64")
     threshold: float = Field(0.8, ge=0.0, le=1.0)
+    embedding: Optional[list[float]] = Field(None, description="Embedding pre-computado (desde inference-server local)")
 
 
 class FacialLoginResponse(BaseModel):
@@ -272,22 +274,27 @@ async def register_face(request: RegisterFaceRequest):
 
     # 1. Validar que TODAS las imagenes tengan rostros detectables ANTES de crear Keycloak user
     valid_embeddings = []
-    for idx, image_b64 in enumerate(request.images):
-        try:
-            embedding = _generate_embedding(image_b64)
-            valid_embeddings.append(embedding)
-        except HTTPException as e:
-            if e.status_code == 502:
+    if request.embeddings:
+        if len(request.embeddings) != len(request.images):
+            raise HTTPException(status_code=400, detail="La cantidad de embeddings no coincide con la cantidad de imagenes")
+        valid_embeddings = request.embeddings
+    else:
+        for idx, image_b64 in enumerate(request.images):
+            try:
+                embedding = _generate_embedding(image_b64)
+                valid_embeddings.append(embedding)
+            except HTTPException as e:
+                if e.status_code == 502:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Foto {idx + 1}: no se detecto un rostro. Asegurate de que todas las fotos muestren tu rostro claramente."
+                    )
+                raise
+            except Exception as e:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Foto {idx + 1}: no se detecto un rostro. Asegurate de que todas las fotos muestren tu rostro claramente."
+                    detail=f"Foto {idx + 1}: error al procesar la imagen: {str(e)}"
                 )
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Foto {idx + 1}: error al procesar la imagen: {str(e)}"
-            )
 
     if len(valid_embeddings) < 4:
         raise HTTPException(status_code=400, detail="Se requieren al menos 4 fotos con rostros detectables")
@@ -392,12 +399,15 @@ async def login_facial(request: FacialLoginRequest):
     genera un token JWT de Keycloak para esa persona.
     """
     # 1. Generar embedding de la foto
-    try:
-        embedding = _generate_embedding(request.image_base64)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error procesando imagen: {str(e)}")
+    if request.embedding:
+        embedding = request.embedding
+    else:
+        try:
+            embedding = _generate_embedding(request.image_base64)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Error procesando imagen: {str(e)}")
 
     # 2. Buscar la persona mas cercana en la BD
     embedding_str = _embedding_to_str(embedding)

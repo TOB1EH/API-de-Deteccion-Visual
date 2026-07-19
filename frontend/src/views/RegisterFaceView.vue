@@ -91,6 +91,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { registerFace } from '../services/api'
+import { localFaceDetect, checkLocalServer } from '../services/inference'
 
 const router = useRouter()
 const fileInput = ref(null)
@@ -116,7 +117,7 @@ async function onFilesSelected(e) {
     if (photos.value.length >= 10) break
     const url = URL.createObjectURL(file)
     const b64 = await fileToBase64Raw(file)
-    photos.value.push({ file, url, b64 })
+    photos.value.push({ file, url, b64, embedding: null })
   }
   e.target.value = ''
 }
@@ -134,13 +135,31 @@ async function handleRegister() {
   loading.value = true
   errorMsg.value = ''
   successMsg.value = ''
+
   try {
+    const localOk = await checkLocalServer()
+    if (!localOk) {
+      throw new Error('El servidor de reconocimiento facial local no esta corriendo en http://localhost:8001')
+    }
+
+    const embeddings = []
+    for (let idx = 0; idx < photos.value.length; idx++) {
+      const photo = photos.value[idx]
+      const blob = await fetch(photo.url).then(r => r.blob())
+      const result = await localFaceDetect(blob)
+      if (!result.embedding) {
+        throw new Error(`Foto ${idx + 1}: no se detecto un rostro. Asegurate de que todas las fotos muestren tu rostro claramente.`)
+      }
+      embeddings.push(result.embedding)
+    }
+
     const result = await registerFace({
       nombre: form.nombre,
       apellido: form.apellido,
       email: form.email,
       password: form.password,
-      images: photos.value.map(p => p.b64)
+      images: photos.value.map(p => p.b64),
+      embeddings: embeddings
     })
     successMsg.value = result.message || 'Registro exitoso!'
     setTimeout(() => router.push('/login'), 2000)

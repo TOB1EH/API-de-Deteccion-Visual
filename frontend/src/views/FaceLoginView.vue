@@ -59,16 +59,18 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { facialLogin } from '../services/api'
 import { authService } from '../services/auth'
+import { localFaceDetect, checkLocalServer } from '../services/inference'
 
 const router = useRouter()
 const fileInput = ref(null)
 const videoRef = ref(null)
 const previewUrl = ref('')
 const imageBase64 = ref('')
+const imageBlob = ref(null)
 const loading = ref(false)
 const errorMsg = ref('')
 const webcamActive = ref(false)
@@ -82,6 +84,7 @@ function triggerFileUpload() {
 function onFileSelected(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  imageBlob.value = file
   const reader = new FileReader()
   reader.onload = () => {
     imageBase64.value = reader.result
@@ -119,6 +122,9 @@ function captureWebcam() {
   canvas.width = video.videoWidth
   canvas.height = video.videoHeight
   canvas.getContext('2d').drawImage(video, 0, 0)
+  canvas.toBlob((blob) => {
+    imageBlob.value = blob
+  }, 'image/jpeg')
   imageBase64.value = canvas.toDataURL('image/jpeg')
   previewUrl.value = imageBase64.value
   stopWebcam()
@@ -129,7 +135,21 @@ async function handleLogin() {
   loading.value = true
   errorMsg.value = ''
   try {
-    const result = await facialLogin({ image_base64: imageBase64.value })
+    const localOk = await checkLocalServer()
+    if (!localOk) {
+      throw new Error('El servidor de reconocimiento facial local no esta corriendo en http://localhost:8001')
+    }
+
+    const blob = imageBlob.value || await (await fetch(imageBase64.value)).blob()
+    const detectResult = await localFaceDetect(blob)
+    if (!detectResult.embedding) {
+      throw new Error('No se detecto un rostro en la imagen')
+    }
+
+    const result = await facialLogin({
+      image_base64: imageBase64.value,
+      embedding: detectResult.embedding
+    })
     const token = result.access_token
     if (token) {
       authService.setToken(token)
@@ -147,8 +167,6 @@ async function handleLogin() {
     loading.value = false
   }
 }
-
-import { nextTick } from 'vue'
 </script>
 
 <style scoped>
