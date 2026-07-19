@@ -150,6 +150,7 @@ async function handleRegister() {
       password: form.password,
     })
     const personId = regResult.person_id
+    const token = regResult.access_token
     step.value = 'uploading'
 
     let successCount = 0
@@ -158,7 +159,7 @@ async function handleRegister() {
       const photo = photos.value[idx]
       const blob = await fetch(photo.url).then(r => r.blob())
       try {
-        await localFaceEmbed(personId, blob, null)
+        await localFaceEmbed(personId, blob, token)
         successCount++
       } catch {
         failCount++

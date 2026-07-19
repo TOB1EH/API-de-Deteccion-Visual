@@ -69,6 +69,8 @@ class RegisterFaceResponse(BaseModel):
     apellido: str
     email: str
     message: str
+    access_token: str = ""
+    token_type: str = "bearer"
 
 
 class FacialLoginRequest(BaseModel):
@@ -272,6 +274,8 @@ async def register_face(request: RegisterFaceRequest):
         )
         if not saved:
             raise Exception("Error al crear persona en BD")
+
+        token_data = get_user_token(request.email, keycloak_password)
     except Exception as e:
         logger.exception("Error en registro, realizando rollback de Keycloak user")
         delete_keycloak_user(keycloak_user_id)
@@ -282,7 +286,9 @@ async def register_face(request: RegisterFaceRequest):
         nombre=request.nombre,
         apellido=request.apellido,
         email=request.email,
-        message="Registro exitoso. Ahora envia las fotos faciales al inference-server local.",
+        message="Registro exitoso. Enviando fotos faciales al inference-server local.",
+        access_token=token_data.get("access_token", ""),
+        token_type=token_data.get("token_type", "bearer"),
     )
 
 
