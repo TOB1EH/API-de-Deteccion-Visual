@@ -58,7 +58,7 @@ FACE_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 loaded_models = {}
 
-API_URL = os.environ.get("API_URL", "http://host.docker.internal:8000")
+API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DEEPFACE_BACKEND = os.environ.get("DEEPFACE_BACKEND", "Facenet")
 DEEPFACE_DETECTOR = os.environ.get("DEEPFACE_DETECTOR", "mtcnn")
 
