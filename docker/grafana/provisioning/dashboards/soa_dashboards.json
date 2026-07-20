@@ -5,15 +5,26 @@
   "schemaVersion": 42,
   "pluginVersion": "12.4.2",
   "refresh": "10s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timezone": "browser",
   "panels": [
     {
       "id": 1,
       "title": "Uso de Recursos",
       "type": "gauge",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"cpu\") |> filter(fn: (r) => r._field == \"usage_idle\" and r.cpu == \"cpu-total\") |> last() |> map(fn: (r) => ({ r with _value: 100.0 - r._value })) |> keep(columns: [\"_value\"]) |> rename(columns: {_value: \"CPU\"}) |> yield(name: \"CPU\")",
@@ -34,8 +45,14 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 80 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
             ]
           }
         },
@@ -46,8 +63,16 @@
       "id": 2,
       "title": "Requests por Minuto",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"api_requests_total\") |> aggregateWindow(every: 1m, fn: max, createEmpty: false) |> difference(columns: [\"_value\"]) |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then 0.0 else r._value })) |> truncateTimeColumn(unit: 1m) |> group(columns: [\"_field\", \"_measurement\"]) |> aggregateWindow(every: 1m, fn: sum, createEmpty: false) |> yield(name: \"requests\")",
@@ -64,23 +89,39 @@
       "id": 3,
       "title": "Tasa de Errores (HTTP 5xx/min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
-          "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"api_requests_total\" and r.http_status =~ /^5/) |> aggregateWindow(every: 1m, fn: max, createEmpty: false) |> difference(columns: [\"_value\"]) |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then 0.0 else r._value })) |> truncateTimeColumn(unit: 1m) |> group(columns: [\"_field\", \"_measurement\"]) |> aggregateWindow(every: 1m, fn: sum, createEmpty: false) |> yield(name: \"errores\")",
+          "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"api_requests_total\") |> map(fn: (r) => ({ r with _value: if exists r.http_status and r.http_status =~ /^5/ then float(v: r._value) else 0.0 })) |> aggregateWindow(every: 1m, fn: max, createEmpty: false) |> difference(columns: [\"_value\"]) |> map(fn: (r) => ({ r with _value: if r._value < 0.0 then 0.0 else r._value })) |> truncateTimeColumn(unit: 1m) |> group(columns: [\"_field\", \"_measurement\"]) |> aggregateWindow(every: 1m, fn: sum, createEmpty: false) |> yield(name: \"errores\")",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
           }
         }
@@ -90,8 +131,16 @@
       "id": 4,
       "title": "Tiempo Promedio de Inferencia",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"prometheus\" and (r._field == \"inference_time_seconds_sum\" or r._field == \"inference_time_seconds_count\")) |> filter(fn: (r) => r._value > 0) |> last() |> group() |> reduce(fn: (r, accumulator) => ({sum: accumulator.sum + (if r._field == \"inference_time_seconds_sum\" then r._value else 0.0), count: accumulator.count + (if r._field == \"inference_time_seconds_count\" then r._value else 0.0)}), identity: {sum: 0.0, count: 0.0}) |> map(fn: (r) => ({ r with _value: if r.count > 0.0 then r.sum / r.count else 0.0 })) |> keep(columns: [\"_value\"])",
@@ -104,9 +153,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 2 },
-              { "color": "red", "value": 5 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
             ]
           }
         }
@@ -116,8 +174,16 @@
       "id": 5,
       "title": "Throughput (Imagenes Procesadas)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 8
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"prometheus\") |> filter(fn: (r) => r._field == \"detections_total\") |> filter(fn: (r) => r._value > 0) |> last() |> yield(name: \"total\")",
@@ -134,8 +200,16 @@
       "id": 6,
       "title": "Tiempo de Generacion de Embeddings",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\") |> filter(fn: (r) => r._field == \"embedding_time_seconds_sum\") |> aggregateWindow(every: 1m, fn: last, createEmpty: false) |> yield(name: \"embedding\")",
@@ -152,8 +226,16 @@
       "id": 7,
       "title": "Tiempo de Comparacion Facial",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\") |> filter(fn: (r) => r._field == \"comparison_time_seconds_sum\") |> aggregateWindow(every: 1m, fn: last, createEmpty: false) |> yield(name: \"comparison\")",
@@ -170,8 +252,16 @@
       "id": 8,
       "title": "Reconocimientos Exitosos vs Fallidos",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"prometheus\") |> filter(fn: (r) => r._field == \"face_recognition_total\" and r.result == \"success\") |> last() |> yield(name: \"exitosos\")",
@@ -192,25 +282,47 @@
       "id": 9,
       "title": "Estado del Nodo de Inferencia",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
-          "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"inference_health\" and r._field == \"estado_binario\") |> last() |> group() |> last() |> yield(name: \"estado\")",
+          "query": "from(bucket: \"metrics\") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"inference_server_up\") |> group() |> last() |> yield(name: \"estado\")",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "value": "0", "text": "OFFLINE" },
-            { "type": "value", "value": "1", "text": "ONLINE" }
+            {
+              "type": "value",
+              "value": "0",
+              "text": "OFFLINE"
+            },
+            {
+              "type": "value",
+              "value": "1",
+              "text": "ONLINE"
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         }
@@ -220,8 +332,16 @@
       "id": 10,
       "title": "Uptime del Sistema",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 8, "x": 12, "y": 24 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 12,
+        "y": 24
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"system\") |> filter(fn: (r) => r._field == \"uptime\") |> last() |> yield(name: \"uptime\")",
@@ -238,8 +358,16 @@
       "id": 11,
       "title": "Ratio de Reconocimiento Exitoso",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 8, "x": 20, "y": 24 },
-      "datasource": { "type": "influxdb", "uid": "bfhay1m297a4gf" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 20,
+        "y": 24
+      },
+      "datasource": {
+        "type": "influxdb",
+        "uid": "bfhay1m297a4gf"
+      },
       "targets": [
         {
           "query": "from(bucket: \"metrics\") |> range(start: -1h) |> filter(fn: (r) => r._measurement == \"prometheus\" and r._field == \"face_recognition_total\" and (r.result == \"success\" or r.result == \"failure\")) |> last() |> group() |> reduce(fn: (r, accumulator) => ({success: accumulator.success + (if r.result == \"success\" then r._value else 0.0), total: accumulator.total + r._value}), identity: {success: 0.0, total: 0.0}) |> map(fn: (r) => ({ r with _value: (r.success / r.total) * 100.0 })) |> keep(columns: [\"_value\"])",
@@ -252,9 +380,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "green", "value": 80 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
             ]
           }
         }
