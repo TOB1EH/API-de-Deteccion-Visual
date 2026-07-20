@@ -174,7 +174,7 @@ async def delete_person(person_id: str):
 
 
 @router.get("/me", response_model=PersonResponse,
-            dependencies=[Depends(require_role(["admin", "operator"]))])
+            dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
 async def get_my_person(auth_data: dict = Depends(verify_token)):
     """
     Retorna la persona vinculada al usuario autenticado (segun keycloak_user_id).
@@ -197,7 +197,7 @@ async def get_my_person(auth_data: dict = Depends(verify_token)):
 
 
 @router.get("/{person_id}", response_model=PersonResponse,
-            dependencies=[Depends(require_role(["admin", "operator"]))])
+            dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
 async def get_person(person_id: str):
     try:
         person = db_service.get_person(person_id)
@@ -218,7 +218,7 @@ async def get_person(person_id: str):
 
 
 @router.get("", response_model=PersonListResponse,
-            dependencies=[Depends(require_role(["admin", "operator"]))])
+            dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
 async def list_persons():
     try:
         persons = db_service.list_persons()
