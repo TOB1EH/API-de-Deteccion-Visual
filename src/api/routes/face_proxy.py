@@ -111,7 +111,8 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
     )
 
 
-@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201)
+@router.post("/persons/{person_id}/embeddings", response_model=FaceEmbedResponse, status_code=201,
+             dependencies=[Depends(require_role(["admin"]))])
 async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
     try:
         conn = db_service.get_connection()

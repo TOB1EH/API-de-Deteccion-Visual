@@ -15,7 +15,12 @@ KEYCLOAK_INTERNAL_URL = os.getenv(
     "http://keycloak:8080",
 )
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "api-detection")
+KEYCLOAK_PUBLIC_URL = os.getenv(
+    "KEYCLOAK_PUBLIC_URL",
+    "https://bfts2026.mooo.com",
+)
 JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
+ISSUER_URL = f"{KEYCLOAK_PUBLIC_URL}/auth/realms/{KEYCLOAK_REALM}"
 
 PUBLIC_PATHS = [
     "/",
@@ -26,7 +31,6 @@ PUBLIC_PATHS = [
     "/api/openapi.json",
     "/metrics",
     "/nginx-health",
-    "/api/face-recognition",
 ]
 
 # Rutas internas que no requieren autenticacion cuando la llamada
@@ -115,7 +119,9 @@ def verify_token(
             token,
             public_key,
             algorithms=[Algorithms.RS256],
-            options={"verify_iss": False, "verify_aud": False},
+            issuer=ISSUER_URL,
+            audience="account",
+            options={"verify_iss": True, "verify_aud": True},
         )
 
         realm_roles = payload.get("realm_access", {}).get("roles", [])
