@@ -173,15 +173,18 @@ async def delete_person(person_id: str):
         )
 
 
+<<<<<<< HEAD
 @router.get("/me", response_model=PersonResponse,
             dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
+=======
+@router.get("/me", response_model=PersonResponse)
+>>>>>>> 60a55bc (crear un usario y conectarlo con personas)
 async def get_my_person(auth_data: dict = Depends(verify_token)):
     """
     Retorna la persona vinculada al usuario autenticado (segun keycloak_user_id).
     GET /api/persons/me
-
-    Requiere que la persona haya sido creada con sesion iniciada para que
-    el keycloak_user_id quede registrado. Si no hay vinculacion, retorna 404.
+    Accesible por cualquier usuario autenticado (admin, operator, viewer).
+    Si no hay vinculacion, retorna 404.
     """
     keycloak_user_id = auth_data.get("sub")
     if not keycloak_user_id:
@@ -191,9 +194,68 @@ async def get_my_person(auth_data: dict = Depends(verify_token)):
     if not person:
         raise HTTPException(
             status_code=404,
-            detail="No hay persona vinculada a este usuario. Cree una persona primero."
+            detail="No hay persona vinculada a este usuario"
         )
     return PersonResponse(**person)
+
+
+@router.post("/me", response_model=PersonResponse, status_code=201)
+async def create_my_person(request: PersonCreate, auth_data: dict = Depends(verify_token)):
+    """
+    Crea una persona vinculada al usuario autenticado.
+    POST /api/persons/me
+    Accesible por cualquier usuario autenticado.
+    Si ya existe una persona vinculada, retorna 409 Conflict.
+    """
+    keycloak_user_id = auth_data.get("sub")
+    if not keycloak_user_id:
+        raise HTTPException(status_code=400, detail="Token invalido: sin sub")
+
+    existing = db_service.get_person_by_keycloak_id(keycloak_user_id)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe una persona vinculada a este usuario"
+        )
+
+    try:
+        person_id = str(uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        name = f"{request.nombre} {request.apellido}"
+
+        saved = db_service.create_person(
+            person_id=person_id,
+            name=name,
+            email=request.email,
+            metadata=request.metadata,
+            keycloak_user_id=keycloak_user_id
+        )
+
+        if not saved:
+            raise HTTPException(
+                status_code=500,
+                detail="Error al crear la persona en la base de datos"
+            )
+
+        return PersonResponse(
+            person_id=person_id,
+            nombre=request.nombre,
+            apellido=request.apellido,
+            email=request.email,
+            keycloak_user_id=keycloak_user_id,
+            metadata=request.metadata or {},
+            created_at=timestamp,
+            updated_at=timestamp
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error creando persona propia")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
 
 
 @router.get("/{person_id}", response_model=PersonResponse,

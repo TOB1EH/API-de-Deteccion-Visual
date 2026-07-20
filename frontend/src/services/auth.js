@@ -6,6 +6,7 @@
 
 import Keycloak from 'keycloak-js'
 import { reactive } from 'vue'
+import axios from 'axios'
 
 // Estado reactivo global
 export const authState = reactive({
@@ -93,6 +94,41 @@ function extractUserFromToken(token) {
   }
 }
 
+async function createPersonIfMissing(token, user) {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const baseURL = isLocalDev ? 'http://localhost:8000/api/' : 'https://bfts2026.mooo.com/api/'
+
+  try {
+    const resp = await axios.get(`${baseURL}persons/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (resp.data?.person_id) {
+      console.log('[Auth] Persona ya vinculada:', resp.data.person_id)
+      return
+    }
+  } catch (err) {
+    if (err.response?.status !== 404) {
+      console.warn('[Auth] Error al verificar persona:', err.message)
+      return
+    }
+  }
+
+  try {
+    const nombre = user.firstName || user.username?.split('@')[0] || 'Usuario'
+    const apellido = user.lastName || ''
+    const email = user.email || ''
+    console.log('[Auth] Creando persona automatica:', nombre, apellido)
+    await axios.post(
+      `${baseURL}persons/me`,
+      { nombre, apellido, email },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    console.log('[Auth] Persona creada exitosamente')
+  } catch (err) {
+    console.warn('[Auth] No se pudo crear persona:', err.response?.data?.detail || err.message)
+  }
+}
+
 export const authService = {
   async init() {
      try {
@@ -118,6 +154,8 @@ export const authService = {
         authState.token = keycloak.token
         authState.user = extractUserFromToken(keycloak.token)
         console.log('[Keycloak] user from token:', authState.user)
+        // Auto-crear persona si no existe vinculada al usuario
+        createPersonIfMissing(keycloak.token, authState.user)
       }
       authState.authenticated = authenticated
       authState.loading = false
