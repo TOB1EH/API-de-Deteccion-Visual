@@ -102,6 +102,17 @@ export async function getPersons() {
   return data
 }
 
+// GET /api/persons/me - Retorna la persona vinculada al token actual
+export async function getMyPerson() {
+  try {
+    const { data } = await api.get('/persons/me')
+    return data
+  } catch {
+    return null
+  }
+}
+
+// POST /api/persons - Crea una nueva persona
 export async function createPerson(personData) {
   const { data } = await api.post('/persons', personData)
   return data
