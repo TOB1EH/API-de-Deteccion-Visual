@@ -1,9 +1,9 @@
 export const LOCAL_INFER_URL = 'http://localhost:8001'
 
 export async function checkLocalServer() {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 3000)
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 3000)
     await fetch(`${LOCAL_INFER_URL}/health`, {
       mode: 'no-cors',
       signal: controller.signal

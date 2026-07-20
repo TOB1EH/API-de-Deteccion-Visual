@@ -201,6 +201,21 @@ BEGIN
 END $$;
 
 -- ============================================================================
+-- MIGRACION: Agregar columna auth_password a tabla persons
+-- Almacena la contrasena temporal para login facial via password grant de Keycloak
+-- ============================================================================
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'persons' AND column_name = 'auth_password'
+    ) THEN
+        ALTER TABLE persons ADD COLUMN auth_password VARCHAR(255);
+        COMMENT ON COLUMN persons.auth_password IS 'Contrasena temporal para autenticacion facial via password grant de Keycloak';
+    END IF;
+END $$;
+
+-- ============================================================================
 -- RESULTADO FINAL
 -- ============================================================================
 -- ✓ Tabla frames: almacena fotogramas con geolocalización + metadatos

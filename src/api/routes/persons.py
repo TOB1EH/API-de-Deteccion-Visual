@@ -28,7 +28,7 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
         auth_password = None
 
         if request.email:
-            password = request.password or secrets.token_urlsafe(12)
+            password = request.password or str(secrets.randbelow(10**8)).zfill(8)
             try:
                 new_keycloak_id = create_keycloak_user(
                     username=request.email,
