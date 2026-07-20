@@ -54,6 +54,19 @@ def delete_keycloak_user(user_id: str) -> None:
         logger.warning("Error eliminando usuario Keycloak %s: %s", user_id, resp.status_code)
 
 
+def clear_user_required_actions(user_id: str) -> None:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"requiredActions": []}
+    resp = requests.put(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        json=payload,
+        headers=headers,
+        timeout=10,
+    )
+    resp.raise_for_status()
+
+
 def create_keycloak_user(username: str, email: str, password: str) -> str:
     existing = find_user_by_email(email)
     if existing:
@@ -79,7 +92,14 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
     location = resp.headers.get("Location", "")
     user_id = location.rstrip("/").split("/")[-1] if location else ""
     if not user_id:
-        return find_user_by_email(email) or ""
+        user_id = find_user_by_email(email) or ""
+
+    if user_id:
+        try:
+            clear_user_required_actions(user_id)
+        except Exception as e:
+            logger.warning("No se pudieron limpiar requiredActions del usuario %s: %s", user_id, e)
+
     return user_id
 
 
