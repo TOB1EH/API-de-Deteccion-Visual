@@ -44,7 +44,7 @@ logs/
 Thumbs.db
 
 # Docker Inferencia en YOLO
-# inference-server/
+inference-server/
 
  # Frontend                                                                                                                
 **/node_modules/**  
