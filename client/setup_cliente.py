@@ -326,6 +326,7 @@ def start_container(models_dir):
         cmd.extend(["-e", f"API_URL={api_url_internal}"])
     else:
         cmd.extend(["--dns", "1.1.1.1", "--dns", "8.8.8.8"])
+        cmd.extend(["--dns", "9.9.9.9"])
         cmd.extend(["-e", f"API_URL={API_URL}"])
     deepface_backend = os.environ.get("DEEPFACE_BACKEND", "Facenet")
     cmd.extend(["-e", f"DEEPFACE_BACKEND={deepface_backend}"])

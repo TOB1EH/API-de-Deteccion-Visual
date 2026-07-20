@@ -7,6 +7,8 @@ class PersonCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=255)
     apellido: str = Field(..., min_length=1, max_length=255)
     email: Optional[str] = Field(None, max_length=255)
+    password: Optional[str] = Field(None, min_length=6, max_length=255,
+                                    description="Contrasena para Keycloak. Si no se provee con email, se auto-genera una.")
     metadata: Optional[dict[str, Any]] = None
 
 
@@ -18,6 +20,8 @@ class PersonResponse(BaseModel):
     keycloak_user_id: Optional[str] = None
     has_faces: bool = False
     profile_image_url: str = ""
+    temporary_password: Optional[str] = Field(None,
+                                              description="Contrasena temporal generada. Solo se devuelve al crear la persona.")
     metadata: Optional[dict[str, Any]] = None
     created_at: str
     updated_at: str

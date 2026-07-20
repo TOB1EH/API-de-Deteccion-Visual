@@ -14,6 +14,9 @@
     </v-col>
 
     <v-col cols="12">
+      <v-alert v-if="errorMsg" type="error" variant="tonal" closable class="mb-4" @click:close="errorMsg = ''">
+        {{ errorMsg }}
+      </v-alert>
       <v-card>
         <div class="pa-4 d-flex align-center border-b">
           <v-text-field
@@ -199,6 +202,32 @@
     </v-card>
   </v-dialog>
 
+  <!-- Dialogo de password temporal para el usuario creado -->
+  <v-dialog v-model="tempPasswordDialog" max-width="480" transition="dialog-top-transition">
+    <v-card class="pa-6 text-center">
+      <v-avatar color="success" size="56" class="mb-3">
+        <v-icon size="28" color="white">mdi-key</v-icon>
+      </v-avatar>
+      <div class="text-h6 font-weight-bold mb-1">Usuario creado exitosamente</div>
+      <p class="text-body-2 text-medium-emphasis mb-4">
+        Comparte esta contrasena temporal con el usuario. Podra cambiarla al iniciar sesion.
+      </p>
+      <v-sheet color="grey-darken-4" rounded="lg" class="pa-4 mb-4 mx-auto" max-width="360">
+        <div class="text-caption text-medium-emphasis mb-1">Email</div>
+        <div class="text-body-1 font-weight-bold text-success">{{ tempPasswordEmail }}</div>
+        <v-divider class="my-3" />
+        <div class="text-caption text-medium-emphasis mb-1">Contrasena temporal</div>
+        <div class="d-flex align-center justify-center ga-2">
+          <code class="text-h6 font-weight-bold text-cyan-accent-3" style="font-size: 1.1rem; letter-spacing: 1px;">{{ tempPasswordValue }}</code>
+          <v-btn icon="mdi-content-copy" size="small" variant="tonal" color="cyan-accent-3" @click="copyTempPassword" />
+        </div>
+      </v-sheet>
+      <v-btn color="primary" @click="tempPasswordDialog = false" class="text-none">
+        Entendido
+      </v-btn>
+    </v-card>
+  </v-dialog>
+
   <!-- Dialogo de confirmacion para eliminar persona -->
   <v-dialog v-model="deleteDialog" max-width="400" transition="dialog-top-transition">
     <v-card class="pa-5">
@@ -250,6 +279,16 @@ const deleteDialog = ref(false)
 const deletingPerson = ref(null)
 const deleting = ref(false)
 
+// Estado del dialogo de password temporal
+const tempPasswordDialog = ref(false)
+const tempPasswordValue = ref('')
+const tempPasswordEmail = ref('')
+const errorMsg = ref('')
+
+function copyTempPassword() {
+  navigator.clipboard.writeText(tempPasswordValue.value)
+}
+
 const filteredPersons = computed(() => {
   if (!search.value) return persons.value
   const q = search.value.toLowerCase()
@@ -275,7 +314,8 @@ function confirmDelete(person) {
 // Actualiza los datos de una persona via API y refresca la lista
 async function updatePersonData(personId, personData) {
   try {
-    const updated = await updatePerson(personId, personData)
+    const { password, ...cleanData } = personData
+    const updated = await updatePerson(personId, cleanData)
     const idx = persons.value.findIndex(p => p.person_id === personId)
     if (idx !== -1) {
       persons.value[idx] = updated
@@ -334,13 +374,25 @@ function selectPerson(p) {
 }
 
 async function savePerson(personData) {
+  errorMsg.value = ''
   try {
     const newPerson = await createPerson(personData)
     persons.value.unshift(newPerson)
     dialog.value = false
     selectedPerson.value = newPerson
+    if (newPerson.temporary_password) {
+      tempPasswordValue.value = newPerson.temporary_password
+      tempPasswordEmail.value = newPerson.email || ''
+      tempPasswordDialog.value = true
+    }
   } catch (err) {
-    console.error('Error al crear persona:', err)
+    const status = err.response?.status
+    const detail = err.response?.data?.detail
+    if (status === 409) {
+      errorMsg.value = detail || 'El email ya esta registrado en Keycloak'
+    } else {
+      errorMsg.value = detail || err.message || 'Error al crear persona'
+    }
   }
 }
 

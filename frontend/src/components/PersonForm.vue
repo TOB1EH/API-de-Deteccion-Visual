@@ -24,6 +24,15 @@
       :rules="[
         v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || 'Email invalido'
       ]"
+      hint="Si se provee email, se crea un usuario en Keycloak"
+      class="mb-3"
+    />
+    <v-text-field
+      v-if="!person"
+      v-model="form.password"
+      label="Contrasena (dejar vacio para auto-generar)"
+      type="password"
+      prepend-inner-icon="mdi-lock"
       class="mb-4"
     />
     <div class="d-flex ga-2 justify-end">
@@ -50,7 +59,8 @@ const emit = defineEmits(['submit', 'cancel'])
 const form = reactive({
   nombre: '',
   apellido: '',
-  email: ''
+  email: '',
+  password: ''
 })
 
 watch(() => props.person, (val) => {
@@ -58,10 +68,12 @@ watch(() => props.person, (val) => {
     form.nombre = val.nombre || ''
     form.apellido = val.apellido || ''
     form.email = val.email || ''
+    form.password = ''
   } else {
     form.nombre = ''
     form.apellido = ''
     form.email = ''
+    form.password = ''
   }
 }, { immediate: true })
 

@@ -1,10 +1,12 @@
 import logging
+import secrets
 from fastapi import APIRouter, HTTPException, Depends
 from uuid import uuid4
 from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
 from ..services.auth import require_role, verify_token
+from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +22,44 @@ router = APIRouter(
 async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_token)):
     try:
         person_id = str(uuid4())
-        # Extraer el sub del token JWT como keycloak_user_id para vincular
-        # la persona registrada con el usuario de Keycloak que la creo
         keycloak_user_id = auth_data.get("sub")
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
+        auth_password = None
+
+        if request.email:
+            password = request.password or secrets.token_urlsafe(12)
+            try:
+                new_keycloak_id = create_keycloak_user(
+                    username=request.email,
+                    email=request.email,
+                    password=password,
+                )
+                try:
+                    assign_realm_role_to_user(new_keycloak_id, "viewer")
+                except Exception as e:
+                    logger.warning("No se pudo asignar rol viewer al usuario %s: %s", request.email, e)
+
+                keycloak_user_id = new_keycloak_id
+                auth_password = password
+            except ValueError as e:
+                raise HTTPException(status_code=409, detail=str(e))
 
         saved = db_service.create_person(
             person_id=person_id,
             name=name,
             email=request.email,
             metadata=request.metadata,
-            keycloak_user_id=keycloak_user_id
+            keycloak_user_id=keycloak_user_id,
+            auth_password=auth_password,
         )
 
         if not saved:
+            if auth_password:
+                try:
+                    delete_keycloak_user(keycloak_user_id)
+                except Exception:
+                    logger.exception("Error haciendo rollback de Keycloak user %s", keycloak_user_id)
             raise HTTPException(
                 status_code=500,
                 detail="Error al crear la persona en la base de datos"
@@ -50,6 +75,7 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
             created_at=timestamp,
             updated_at=timestamp,
             profile_image_url="",
+            temporary_password=auth_password,
         )
 
     except HTTPException:
