@@ -6,7 +6,7 @@
   "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
-  "resetPasswordAllowed": false,
+  "resetPasswordAllowed": true,
   "roles": {
     "realm": [
       {
@@ -154,7 +154,19 @@
     "xXSSProtection": "1; mode=block",
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
-  "smtpServer": {},
+  "smtpServer": {
+    "host": "smtp.gmail.com",
+    "port": "587",
+    "from": "abrambilla804@alumnos.iua.edu.ar",
+    "fromDisplayName": "API Deteccion Visual",
+    "auth": true,
+    "starttls": true,
+    "ssl": false,
+    "user": "abrambilla804@alumnos.iua.edu.ar",
+    "password": "${SMTP_PASSWORD}",
+    "connectionTimeout": "10000",
+    "timeout": "10000"
+  },
   "eventsEnabled": false,
   "eventsListeners": ["jboss-logging"],
   "enabledEventTypes": [],
