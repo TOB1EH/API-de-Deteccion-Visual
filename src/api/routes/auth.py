@@ -30,9 +30,9 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from ..services.db_service import db_service
-from ..services.auth import verify_token
+from ..services.auth import verify_token, create_facial_token
 from ..services.image_utils import validate_image, get_format_and_mime
-from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user, get_user_token
+from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user
 
 logger = logging.getLogger(__name__)
 
@@ -325,26 +325,55 @@ async def login_facial(request: FacialLoginRequest):
     if not person:
         raise HTTPException(status_code=401, detail="Persona no encontrada")
 
-    auth_password = db_service.get_auth_password(person_id)
-    if not auth_password:
-        raise HTTPException(status_code=500, detail="Error interno: password de autenticacion no encontrada")
-
     email = person.get("email", "")
-    try:
-        token_data = get_user_token(email, auth_password)
-    except Exception as e:
-        logger.exception("Error obteniendo token de Keycloak")
-        raise HTTPException(status_code=502, detail=f"Error obteniendo token de autenticacion: {str(e)}")
-
     name_parts = person["name"].split(" ", 1)
     nombre = name_parts[0]
     apellido = name_parts[1] if len(name_parts) > 1 else ""
 
+    conn = db_service.get_connection()
+    try:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT keycloak_user_id FROM persons WHERE person_id = %s",
+            (person_id,),
+        )
+        person_row = cursor.fetchone()
+        cursor.close()
+    finally:
+        conn.close()
+
+    keycloak_user_id = person_row["keycloak_user_id"] if person_row else None
+
+    roles = ["viewer"]
+    if keycloak_user_id:
+        try:
+            from ..services.keycloak_admin import _get_admin_token
+            kc_url = os.getenv("KEYCLOAK_INTERNAL_URL", "http://keycloak:8080")
+            kc_realm = os.getenv("KEYCLOAK_REALM", "api-detection")
+            headers = {"Authorization": f"Bearer {_get_admin_token()}"}
+            resp = requests.get(
+                f"{kc_url}/auth/admin/realms/{kc_realm}/users/{keycloak_user_id}/role-mappings/realm",
+                headers=headers,
+                timeout=10,
+            )
+            if resp.ok:
+                assigned_roles = resp.json()
+                roles = [r["name"] for r in assigned_roles]
+        except Exception as e:
+            logger.warning("Error obteniendo roles de Keycloak: %s", e)
+
+    access_token = create_facial_token(
+        person_id=person_id,
+        email=email,
+        roles=roles,
+        keycloak_user_id=keycloak_user_id,
+    )
+
     return FacialLoginResponse(
-        access_token=token_data.get("access_token", ""),
-        token_type=token_data.get("token_type", "bearer"),
-        expires_in=token_data.get("expires_in", 0),
-        scope=token_data.get("scope", ""),
+        access_token=access_token,
+        token_type="bearer",
+        expires_in=3600,
+        scope="openid profile email",
         person_id=person_id,
         nombre=nombre,
         apellido=apellido,

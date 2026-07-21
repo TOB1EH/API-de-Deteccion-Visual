@@ -16,6 +16,8 @@ KEYCLOAK_INTERNAL_URL = os.getenv(
 )
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "api-detection")
 JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
+FACIAL_JWT_SECRET = os.getenv("FACIAL_JWT_SECRET", "facial-jwt-secret-change-in-production")
+FACIAL_JWT_ALGORITHM = "HS256"
 
 PUBLIC_PATHS = [
     "/",
@@ -71,6 +73,21 @@ def _find_rsa_key(jwks: list[dict], kid: str | None) -> dict | None:
     return None
 
 
+def create_facial_token(person_id: str, email: str, roles: list[str], keycloak_user_id: str | None = None) -> str:
+    from datetime import datetime, timezone, timedelta
+    payload = {
+        "sub": keycloak_user_id or person_id,
+        "person_id": person_id,
+        "email": email,
+        "preferred_username": email,
+        "realm_access": {"roles": roles},
+        "iss": "api-deteccion-visual",
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+    }
+    return jwt.encode(payload, FACIAL_JWT_SECRET, algorithm=FACIAL_JWT_ALGORITHM)
+
+
 def verify_token(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
@@ -97,31 +114,37 @@ def verify_token(
         headers = jwt.get_unverified_header(token)
         kid = headers.get("kid")
 
-        jwks = _fetch_jwks()
-        if not jwks:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No se pudieron obtener claves de Keycloak",
+        # Si tiene kid, es token de Keycloak (RS256 via JWKS)
+        if kid:
+            jwks = _fetch_jwks()
+            if not jwks:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="No se pudieron obtener claves de Keycloak",
+                )
+            rsa_key = _find_rsa_key(jwks, kid)
+            if rsa_key is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Clave RSA no encontrada en JWKS",
+                )
+            public_key = jwk.construct(rsa_key)
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=[Algorithms.RS256],
+                options={"verify_iss": False, "verify_aud": False},
             )
-
-        rsa_key = _find_rsa_key(jwks, kid)
-        if rsa_key is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Clave RSA no encontrada en JWKS",
+        else:
+            # Sin kid: es token facial firmado con HS256
+            payload = jwt.decode(
+                token,
+                FACIAL_JWT_SECRET,
+                algorithms=[FACIAL_JWT_ALGORITHM],
+                options={"verify_iss": False, "verify_aud": False},
             )
-
-        public_key = jwk.construct(rsa_key)
-
-        payload = jwt.decode(
-            token,
-            public_key,
-            algorithms=[Algorithms.RS256],
-            options={"verify_iss": False, "verify_aud": False},
-        )
 
         realm_roles = payload.get("realm_access", {}).get("roles", [])
-
         return {
             "sub": payload.get("sub"),
             "preferred_username": payload.get("preferred_username"),
