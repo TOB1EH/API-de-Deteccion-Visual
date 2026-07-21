@@ -18,9 +18,8 @@ class PersonResponse(BaseModel):
     keycloak_user_id: Optional[str] = None
     has_faces: bool = False
     profile_image_url: str = ""
-    temporary_password: Optional[str] = Field(None,
-                                              description="Contrasena temporal generada. Solo se devuelve al crear la persona.")
     metadata: Optional[dict[str, Any]] = None
+    keycloak_roles: list[str] = []
     created_at: str
     updated_at: str
 

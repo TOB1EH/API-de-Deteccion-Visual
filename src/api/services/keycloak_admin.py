@@ -27,6 +27,81 @@ def _get_admin_token() -> str:
     return resp.json()["access_token"]
 
 
+def list_keycloak_users() -> list[dict]:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    users = []
+    first = 0
+    max_results = 100
+    while True:
+        resp = requests.get(
+            f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users",
+            params={"first": first, "max": max_results},
+            headers=headers,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        batch = resp.json()
+        if not batch:
+            break
+        users.extend(batch)
+        first += len(batch)
+    return users
+
+
+def update_keycloak_user(user_id: str, first_name: str, last_name: str, email: str) -> None:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {
+        "firstName": first_name,
+        "lastName": last_name,
+        "email": email,
+    }
+    resp = requests.put(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        json=payload,
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        logger.error("Keycloak update user error %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+
+
+def get_user_realm_roles(user_id: str) -> list[str]:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/role-mappings/realm",
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        logger.warning("Error fetching roles for user %s: %s", user_id, resp.status_code)
+        return []
+    return [r["name"] for r in resp.json()]
+
+
+def execute_actions_email(user_id: str, actions: list[str] | None = None) -> None:
+    if actions is None:
+        actions = ["UPDATE_PASSWORD"]
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {
+        "actions": actions,
+        "lifespan": 43200,
+    }
+    resp = requests.put(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/execute-actions-email",
+        json=payload,
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        logger.error("Keycloak execute-actions-email error %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+
+
 def find_user_by_email(email: str) -> Optional[str]:
     token = _get_admin_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -93,7 +168,8 @@ def clear_user_required_actions(user_id: str) -> None:
     resp.raise_for_status()
 
 
-def create_keycloak_user(username: str, email: str, password: str) -> str:
+def create_keycloak_user(username: str, email: str, password: str | None = None,
+                        send_email: bool = False) -> str:
     existing = find_user_by_email(email)
     if existing:
         raise ValueError(f"El usuario {username} ya existe en Keycloak")
@@ -107,6 +183,9 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
         "enabled": True,
         "requiredActions": [],
     }
+    if send_email:
+        payload["requiredActions"] = ["UPDATE_PASSWORD"]
+
     resp = requests.post(
         f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users",
         json=payload,
@@ -120,6 +199,12 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
         user_id = find_user_by_email(email) or ""
 
     if user_id:
+        if send_email:
+            try:
+                execute_actions_email(user_id, ["UPDATE_PASSWORD"])
+            except Exception as e:
+                logger.warning("No se pudo enviar email a %s: %s", email, e)
+            return user_id
         try:
             set_user_password(user_id, password)
             try:

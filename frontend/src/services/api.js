@@ -102,6 +102,15 @@ export async function getPersons() {
   return data
 }
 
+export async function syncKeycloakPersons() {
+  try {
+    const { data } = await api.post('/persons/sync-keycloak')
+    return data
+  } catch {
+    return null
+  }
+}
+
 // GET /api/persons/me - Retorna la persona vinculada al token actual
 export async function getMyPerson() {
   try {

@@ -26,6 +26,7 @@ from ..services.db_service import DatabaseService
 from ..routes.metrics import EMBEDDING_TIME, COMPARISON_TIME, RECOGNITION_COUNT
 from ..services.auth import require_role, verify_token
 from ..services.image_utils import validate_image, get_format_and_mime
+from ..services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -62,15 +63,18 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
     import io
 
     # Verificar persona
+    person_email = None
     conn = db_service.get_connection()
     try:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute(
-            "SELECT person_id::TEXT, name FROM persons WHERE person_id = %s",
+            "SELECT person_id::TEXT, name, email FROM persons WHERE person_id = %s",
             (person_id,),
         )
-        if not cursor.fetchone():
+        row = cursor.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail=f"Persona {person_id} no encontrada")
+        person_email = row.get("email")
         cursor.close()
     finally:
         conn.close()
@@ -103,6 +107,19 @@ async def create_face_embedding_orchestrated(person_id: str, request: FaceEmbedU
         request.image_base64, f"face_{person_id}_{uuid4()}", mime_type=mime_type
     )
 
+    if person_email:
+        send_email(
+            to=person_email,
+            subject="Datos biometricos cargados",
+            body=(
+                "Estimado/a,\n\n"
+                "Sus datos biometricos han sido cargados exitosamente en el sistema "
+                "API Deteccion Visual.\n\n"
+                "Ya puede iniciar sesion utilizando reconocimiento facial.\n\n"
+                "Saludos,\nEquipo API Deteccion Visual"
+            ),
+        )
+
     return FaceEmbedUploadResponse(
         person_id=person_id,
         valid_embeddings=1 if image_url else 0,
@@ -119,7 +136,7 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
 
         cursor.execute(
-            "SELECT person_id::TEXT, name FROM persons WHERE person_id = %s",
+            "SELECT person_id::TEXT, name, email FROM persons WHERE person_id = %s",
             (person_id,),
         )
         person = cursor.fetchone()
@@ -127,6 +144,7 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
             cursor.close()
             conn.close()
             raise HTTPException(status_code=404, detail=f"Persona {person_id} no encontrada")
+        person_email = person.get("email")
 
         image_b64 = request.image_base64
         raw_bytes = base64.b64decode(image_b64.split(",")[-1])
@@ -160,6 +178,20 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
         conn.close()
 
         logger.info("Embedding %s persistido para persona %s", embedding_id, person_id)
+
+        if person_email:
+            send_email(
+                to=person_email,
+                subject="Datos biometricos cargados",
+                body=(
+                    "Estimado/a,\n\n"
+                    "Sus datos biometricos han sido cargados exitosamente en el sistema "
+                    "API Deteccion Visual.\n\n"
+                    "Ya puede iniciar sesion utilizando reconocimiento facial.\n\n"
+                    "Saludos,\nEquipo API Deteccion Visual"
+                ),
+            )
+
         return FaceEmbedResponse(
             person_id=person_id,
             processed_images=1,

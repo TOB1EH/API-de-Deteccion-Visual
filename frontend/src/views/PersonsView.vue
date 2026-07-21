@@ -42,6 +42,7 @@
               <th class="text-body-2 font-weight-bold">Nombre</th>
               <th class="text-body-2 font-weight-bold">Apellido</th>
               <th class="text-body-2 font-weight-bold">Email</th>
+              <th class="text-body-2 font-weight-bold">Roles</th>
               <th class="text-body-2 font-weight-bold">Registro</th>
               <th class="text-body-2 font-weight-bold text-center">Rostros</th>
             </tr>
@@ -59,13 +60,26 @@
               <td>
                 <span class="text-medium-emphasis">{{ p.email || '-' }}</span>
               </td>
+              <td>
+                <v-chip
+                  v-for="role in (p.keycloak_roles || [])"
+                  :key="role"
+                  :color="role === 'admin' ? 'red' : role === 'operator' ? 'primary' : 'grey'"
+                  size="x-small"
+                  variant="tonal"
+                  class="mr-1"
+                >
+                  {{ role }}
+                </v-chip>
+                <span v-if="!p.keycloak_roles?.length" class="text-caption text-grey">-</span>
+              </td>
               <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at + 'Z').toLocaleDateString() }}</td>
               <td class="text-center">
                 <v-icon color="success" size="small">mdi-check-circle</v-icon>
               </td>
             </tr>
             <tr v-if="filteredPersons.length === 0">
-              <td colspan="5" class="text-center pa-8">
+              <td colspan="6" class="text-center pa-8">
                 <v-icon size="48" color="grey" class="mb-2">mdi-account-off</v-icon>
                 <p class="text-body-1 text-medium-emphasis">No se encontraron personas</p>
               </td>
@@ -202,27 +216,18 @@
     </v-card>
   </v-dialog>
 
-  <!-- Dialogo de password temporal para el usuario creado -->
-  <v-dialog v-model="tempPasswordDialog" max-width="480" transition="dialog-top-transition">
+  <!-- Dialogo de confirmacion de envio de email -->
+  <v-dialog v-model="emailSentDialog" max-width="420" transition="dialog-top-transition">
     <v-card class="pa-6 text-center">
       <v-avatar color="success" size="56" class="mb-3">
-        <v-icon size="28" color="white">mdi-key</v-icon>
+        <v-icon size="28" color="white">mdi-email-check</v-icon>
       </v-avatar>
       <div class="text-h6 font-weight-bold mb-1">Usuario creado exitosamente</div>
       <p class="text-body-2 text-medium-emphasis mb-4">
-        Comparte esta contrasena temporal con el usuario. Podra cambiarla al iniciar sesion.
+        Se ha enviado un correo a <strong>{{ emailSentTo }}</strong> con las instrucciones
+        para establecer su contrasena.
       </p>
-      <v-sheet color="grey-darken-4" rounded="lg" class="pa-4 mb-4 mx-auto" max-width="360">
-        <div class="text-caption text-medium-emphasis mb-1">Email</div>
-        <div class="text-body-1 font-weight-bold text-success">{{ tempPasswordEmail }}</div>
-        <v-divider class="my-3" />
-        <div class="text-caption text-medium-emphasis mb-1">Contrasena temporal</div>
-        <div class="d-flex align-center justify-center ga-2">
-          <code class="text-h6 font-weight-bold text-cyan-accent-3" style="font-size: 1.1rem; letter-spacing: 1px;">{{ tempPasswordValue }}</code>
-          <v-btn icon="mdi-content-copy" size="small" variant="tonal" color="cyan-accent-3" @click="copyTempPassword" />
-        </div>
-      </v-sheet>
-      <v-btn color="primary" @click="tempPasswordDialog = false" class="text-none">
+      <v-btn color="primary" @click="emailSentDialog = false" class="text-none">
         Entendido
       </v-btn>
     </v-card>
@@ -255,7 +260,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64 } from '../services/api'
+import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64, syncKeycloakPersons } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
 import { isAdmin, authState } from '../services/auth'
 import { checkLocalServer, localFaceEmbed } from '../services/inference'
@@ -279,15 +284,9 @@ const deleteDialog = ref(false)
 const deletingPerson = ref(null)
 const deleting = ref(false)
 
-// Estado del dialogo de password temporal
-const tempPasswordDialog = ref(false)
-const tempPasswordValue = ref('')
-const tempPasswordEmail = ref('')
+const emailSentDialog = ref(false)
+const emailSentTo = ref('')
 const errorMsg = ref('')
-
-function copyTempPassword() {
-  navigator.clipboard.writeText(tempPasswordValue.value)
-}
 
 const filteredPersons = computed(() => {
   if (!search.value) return persons.value
@@ -354,8 +353,18 @@ function goToPersonDetail(personId) {
 
 onMounted(async () => {
   try {
-    const data = await getPersons()
-    persons.value = data.persons || []
+    if (isAdmin()) {
+      const synced = await syncKeycloakPersons()
+      if (synced?.persons) {
+        persons.value = synced.persons
+      } else {
+        const data = await getPersons()
+        persons.value = data.persons || []
+      }
+    } else {
+      const data = await getPersons()
+      persons.value = data.persons || []
+    }
   } catch {
     persons.value = []
   }
@@ -380,11 +389,8 @@ async function savePerson(personData) {
     persons.value.unshift(newPerson)
     dialog.value = false
     selectedPerson.value = newPerson
-    if (newPerson.temporary_password) {
-      tempPasswordValue.value = newPerson.temporary_password
-      tempPasswordEmail.value = newPerson.email || ''
-      tempPasswordDialog.value = true
-    }
+    emailSentTo.value = newPerson.email || ''
+    emailSentDialog.value = true
   } catch (err) {
     const status = err.response?.status
     const detail = err.response?.data?.detail

@@ -173,6 +173,12 @@ services:
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
       FACIAL_JWT_SECRET: ${FACIAL_JWT_SECRET:-cambiar-en-produccion-clave-secreta-2026}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-abrambilla804@alumnos.iua.edu.ar}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:-abrambilla804@alumnos.iua.edu.ar}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-API Deteccion Visual}
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro
