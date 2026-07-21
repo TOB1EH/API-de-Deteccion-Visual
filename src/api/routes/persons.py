@@ -4,7 +4,12 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
-from ..services.auth import require_role, verify_token, delete_keycloak_user
+from ..services.auth import require_role, verify_token
+from ..services.keycloak_admin import (
+    create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user,
+    update_keycloak_user, get_user_realm_roles, list_keycloak_users,
+)
+from ..services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -20,37 +25,71 @@ router = APIRouter(
 async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_token)):
     try:
         person_id = str(uuid4())
-        # Extraer el sub del token JWT como keycloak_user_id para vincular
-        # la persona registrada con el usuario de Keycloak que la creo
-        keycloak_user_id = auth_data.get("sub")
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
+
+        try:
+            new_keycloak_id, temp_password = create_keycloak_user(
+                username=request.email,
+                email=request.email,
+                send_email=True,
+                first_name=request.nombre,
+                last_name=request.apellido,
+            )
+            try:
+                assign_realm_role_to_user(new_keycloak_id, "operator")
+            except Exception as e:
+                logger.warning("No se pudo asignar rol operator al usuario %s: %s", request.email, e)
+            keycloak_user_id = new_keycloak_id
+
+            if temp_password:
+                send_email(
+                    to=request.email,
+                    subject="Credenciales de acceso - API Deteccion Visual",
+                    body=(
+                        f"Estimado/a {request.nombre} {request.apellido},\n\n"
+                        "Su cuenta ha sido creada en el sistema API Deteccion Visual.\n\n"
+                        "Sus credenciales de acceso son:\n"
+                        f"  Usuario: {request.email}\n"
+                        f"  Contrasena: {temp_password}\n\n"
+                        "Puede iniciar sesion en: https://bfts2026.mooo.com/\n\n"
+                        "Se recomienda cambiar la contrasena despues del primer inicio de sesion.\n\n"
+                        "Saludos,\nEquipo API Deteccion Visual"
+                    ),
+                )
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
 
         saved = db_service.create_person(
             person_id=person_id,
             name=name,
             email=request.email,
             metadata=request.metadata,
-            keycloak_user_id=keycloak_user_id
+            keycloak_user_id=keycloak_user_id,
         )
 
         if not saved:
+            try:
+                delete_keycloak_user(keycloak_user_id)
+            except Exception:
+                logger.exception("Error haciendo rollback de Keycloak user %s", keycloak_user_id)
             raise HTTPException(
                 status_code=500,
                 detail="Error al crear la persona en la base de datos"
             )
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=keycloak_user_id,
-            metadata=request.metadata or {},
-            created_at=timestamp,
-            updated_at=timestamp,
-            profile_image_url="",
-        )
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "metadata": request.metadata or {},
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "profile_image_url": "",
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
@@ -105,18 +144,31 @@ async def update_person(person_id: str, request: PersonUpdate):
                 detail="Error al actualizar la persona en la base de datos"
             )
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=existing.get("keycloak_user_id"),
-            has_faces=existing.get("has_faces", False),
-            profile_image_url=request.profile_image_url or existing.get("profile_image_url", ""),
-            metadata=request.metadata or {},
-            created_at=existing["created_at"],
-            updated_at=timestamp
-        )
+        keycloak_user_id = existing.get("keycloak_user_id")
+        if keycloak_user_id:
+            try:
+                update_keycloak_user(
+                    keycloak_user_id,
+                    first_name=request.nombre,
+                    last_name=request.apellido,
+                    email=request.email or "",
+                )
+            except Exception as e:
+                logger.warning("No se pudo actualizar usuario Keycloak %s: %s", keycloak_user_id, e)
+
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "has_faces": existing.get("has_faces", False),
+            "profile_image_url": request.profile_image_url or existing.get("profile_image_url", ""),
+            "metadata": request.metadata or {},
+            "created_at": existing["created_at"],
+            "updated_at": timestamp,
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
@@ -145,7 +197,6 @@ async def delete_person(person_id: str):
         500 si hay error de base de datos
     """
     try:
-        # Verificar que la persona existe
         existing = db_service.get_person(person_id)
         if not existing:
             raise HTTPException(
@@ -154,6 +205,12 @@ async def delete_person(person_id: str):
             )
 
         keycloak_user_id = existing.get("keycloak_user_id")
+        if keycloak_user_id:
+            try:
+                delete_keycloak_user(keycloak_user_id)
+            except Exception as e:
+                logger.warning("No se pudo eliminar usuario Keycloak %s: %s", keycloak_user_id, e)
+
         deleted = db_service.delete_person(person_id)
 
         if not deleted:
@@ -161,9 +218,6 @@ async def delete_person(person_id: str):
                 status_code=500,
                 detail="Error al eliminar la persona de la base de datos"
             )
-
-        # Eliminar el usuario vinculado de Keycloak (si existe)
-        delete_keycloak_user(keycloak_user_id)
 
         return None
 
@@ -177,15 +231,15 @@ async def delete_person(person_id: str):
         )
 
 
-@router.get("/me", response_model=PersonResponse,
-            dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
+def _enrich_person_with_roles(person: dict) -> dict:
+    kcid = person.get("keycloak_user_id")
+    if kcid:
+        person["keycloak_roles"] = get_user_realm_roles(kcid)
+    return person
+
+
+@router.get("/me", response_model=PersonResponse)
 async def get_my_person(auth_data: dict = Depends(verify_token)):
-    """
-    Retorna la persona vinculada al usuario autenticado (segun keycloak_user_id).
-    GET /api/persons/me
-    Accesible por cualquier usuario autenticado (admin, operator, viewer).
-    Si no hay vinculacion, retorna 404.
-    """
     keycloak_user_id = auth_data.get("sub")
     if not keycloak_user_id:
         raise HTTPException(status_code=400, detail="Token invalido: sin sub")
@@ -196,7 +250,7 @@ async def get_my_person(auth_data: dict = Depends(verify_token)):
             status_code=404,
             detail="No hay persona vinculada a este usuario"
         )
-    return PersonResponse(**person)
+    return PersonResponse(**_enrich_person_with_roles(person))
 
 
 @router.post("/me", response_model=PersonResponse, status_code=201)
@@ -223,6 +277,16 @@ async def create_my_person(request: PersonCreate, auth_data: dict = Depends(veri
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
 
+        try:
+            update_keycloak_user(
+                keycloak_user_id,
+                first_name=request.nombre,
+                last_name=request.apellido,
+                email=request.email or "",
+            )
+        except Exception as e:
+            logger.warning("No se pudo actualizar nombre en Keycloak: %s", e)
+
         saved = db_service.create_person(
             person_id=person_id,
             name=name,
@@ -237,16 +301,17 @@ async def create_my_person(request: PersonCreate, auth_data: dict = Depends(veri
                 detail="Error al crear la persona en la base de datos"
             )
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=keycloak_user_id,
-            metadata=request.metadata or {},
-            created_at=timestamp,
-            updated_at=timestamp
-        )
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "metadata": request.metadata or {},
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
@@ -256,6 +321,45 @@ async def create_my_person(request: PersonCreate, auth_data: dict = Depends(veri
             status_code=500,
             detail=f"Error interno: {str(e)}"
         )
+
+
+@router.post("/sync-keycloak", response_model=PersonListResponse,
+             dependencies=[Depends(require_role(["admin"]))])
+async def sync_keycloak_users():
+    try:
+        kc_users = list_keycloak_users()
+        existing_persons = db_service.list_persons()
+        existing_kc_ids = {p.get("keycloak_user_id") for p in existing_persons if p.get("keycloak_user_id")}
+
+        created = []
+        for kc_user in kc_users:
+            kcid = kc_user.get("id")
+            if kcid in existing_kc_ids:
+                continue
+            email = kc_user.get("email") or f"{kc_user['username']}@placeholder.local"
+            person_id = str(uuid4())
+            timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+            first = kc_user.get("firstName") or kc_user["username"]
+            last = kc_user.get("lastName") or ""
+            name = f"{first} {last}"
+
+            saved = db_service.create_person(
+                person_id=person_id,
+                name=name,
+                email=email,
+                keycloak_user_id=kcid,
+            )
+            if saved:
+                created.append(person_id)
+
+        persons = db_service.list_persons()
+        return PersonListResponse(
+            total=len(persons),
+            persons=[PersonResponse(**_enrich_person_with_roles(p)) for p in persons]
+        )
+    except Exception as e:
+        logger.exception("Error sincronizando usuarios Keycloak")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
 
 
 @router.get("/{person_id}", response_model=PersonResponse,
@@ -268,7 +372,7 @@ async def get_person(person_id: str):
                 status_code=404,
                 detail=f"Persona {person_id} no encontrada"
             )
-        return PersonResponse(**person)
+        return PersonResponse(**_enrich_person_with_roles(person))
     except HTTPException:
         raise
     except Exception as e:
@@ -286,7 +390,7 @@ async def list_persons():
         persons = db_service.list_persons()
         return PersonListResponse(
             total=len(persons),
-            persons=[PersonResponse(**p) for p in persons]
+            persons=[PersonResponse(**_enrich_person_with_roles(p)) for p in persons]
         )
     except Exception as e:
         logger.exception("Error listando personas")

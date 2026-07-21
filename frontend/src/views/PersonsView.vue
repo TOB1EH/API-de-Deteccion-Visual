@@ -14,6 +14,9 @@
     </v-col>
 
     <v-col cols="12">
+      <v-alert v-if="errorMsg" type="error" variant="tonal" closable class="mb-4" @click:close="errorMsg = ''">
+        {{ errorMsg }}
+      </v-alert>
       <v-card>
         <div class="pa-4 d-flex align-center border-b">
           <v-text-field
@@ -39,6 +42,7 @@
               <th class="text-body-2 font-weight-bold">Nombre</th>
               <th class="text-body-2 font-weight-bold">Apellido</th>
               <th class="text-body-2 font-weight-bold">Email</th>
+              <th class="text-body-2 font-weight-bold">Roles</th>
               <th class="text-body-2 font-weight-bold">Registro</th>
               <th class="text-body-2 font-weight-bold text-center">Rostros</th>
             </tr>
@@ -56,13 +60,26 @@
               <td>
                 <span class="text-medium-emphasis">{{ p.email || '-' }}</span>
               </td>
+              <td>
+                <v-chip
+                  v-for="role in (p.keycloak_roles || [])"
+                  :key="role"
+                  :color="role === 'admin' ? 'red' : role === 'operator' ? 'primary' : 'grey'"
+                  size="x-small"
+                  variant="tonal"
+                  class="mr-1"
+                >
+                  {{ role }}
+                </v-chip>
+                <span v-if="!p.keycloak_roles?.length" class="text-caption text-grey">-</span>
+              </td>
               <td class="text-caption text-medium-emphasis">{{ new Date(p.created_at + 'Z').toLocaleDateString() }}</td>
               <td class="text-center">
                 <v-icon color="success" size="small">mdi-check-circle</v-icon>
               </td>
             </tr>
             <tr v-if="filteredPersons.length === 0">
-              <td colspan="5" class="text-center pa-8">
+              <td colspan="6" class="text-center pa-8">
                 <v-icon size="48" color="grey" class="mb-2">mdi-account-off</v-icon>
                 <p class="text-body-1 text-medium-emphasis">No se encontraron personas</p>
               </td>
@@ -199,6 +216,23 @@
     </v-card>
   </v-dialog>
 
+  <!-- Dialogo de confirmacion de envio de email -->
+  <v-dialog v-model="emailSentDialog" max-width="420" transition="dialog-top-transition">
+    <v-card class="pa-6 text-center">
+      <v-avatar color="success" size="56" class="mb-3">
+        <v-icon size="28" color="white">mdi-email-check</v-icon>
+      </v-avatar>
+      <div class="text-h6 font-weight-bold mb-1">Usuario creado exitosamente</div>
+      <p class="text-body-2 text-medium-emphasis mb-4">
+        Se ha enviado un correo a <strong>{{ emailSentTo }}</strong> con las instrucciones
+        para establecer su contrasena.
+      </p>
+      <v-btn color="primary" @click="emailSentDialog = false" class="text-none">
+        Entendido
+      </v-btn>
+    </v-card>
+  </v-dialog>
+
   <!-- Dialogo de confirmacion para eliminar persona -->
   <v-dialog v-model="deleteDialog" max-width="400" transition="dialog-top-transition">
     <v-card class="pa-5">
@@ -226,7 +260,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64 } from '../services/api'
+import { getPersons, createPerson, updatePerson, deletePerson, postFaceEmbed, fileToBase64, syncKeycloakPersons } from '../services/api'
 import PersonForm from '../components/PersonForm.vue'
 import { isAdmin, authState } from '../services/auth'
 import { checkLocalServer, localFaceEmbed } from '../services/inference'
@@ -249,6 +283,10 @@ const hasLocalServer = ref(false)
 const deleteDialog = ref(false)
 const deletingPerson = ref(null)
 const deleting = ref(false)
+
+const emailSentDialog = ref(false)
+const emailSentTo = ref('')
+const errorMsg = ref('')
 
 const filteredPersons = computed(() => {
   if (!search.value) return persons.value
@@ -275,7 +313,8 @@ function confirmDelete(person) {
 // Actualiza los datos de una persona via API y refresca la lista
 async function updatePersonData(personId, personData) {
   try {
-    const updated = await updatePerson(personId, personData)
+    const { password, ...cleanData } = personData
+    const updated = await updatePerson(personId, cleanData)
     const idx = persons.value.findIndex(p => p.person_id === personId)
     if (idx !== -1) {
       persons.value[idx] = updated
@@ -314,8 +353,18 @@ function goToPersonDetail(personId) {
 
 onMounted(async () => {
   try {
-    const data = await getPersons()
-    persons.value = data.persons || []
+    if (isAdmin()) {
+      const synced = await syncKeycloakPersons()
+      if (synced?.persons) {
+        persons.value = synced.persons
+      } else {
+        const data = await getPersons()
+        persons.value = data.persons || []
+      }
+    } else {
+      const data = await getPersons()
+      persons.value = data.persons || []
+    }
   } catch {
     persons.value = []
   }
@@ -334,13 +383,22 @@ function selectPerson(p) {
 }
 
 async function savePerson(personData) {
+  errorMsg.value = ''
   try {
     const newPerson = await createPerson(personData)
     persons.value.unshift(newPerson)
     dialog.value = false
     selectedPerson.value = newPerson
+    emailSentTo.value = newPerson.email || ''
+    emailSentDialog.value = true
   } catch (err) {
-    console.error('Error al crear persona:', err)
+    const status = err.response?.status
+    const detail = err.response?.data?.detail
+    if (status === 409) {
+      errorMsg.value = detail || 'El email ya esta registrado en Keycloak'
+    } else {
+      errorMsg.value = detail || err.message || 'Error al crear persona'
+    }
   }
 }
 

@@ -56,7 +56,26 @@
           Requiere configurar credenciales de Google OAuth en Keycloak admin
         </p>
 
-        <v-divider class="my-6" />
+        <v-divider class="my-4" />
+
+        <p class="text-caption text-grey mb-3 text-center font-weight-bold">
+          <v-icon size="14" class="mr-1">mdi-face-recognition</v-icon>
+          AUTENTICACION FACIAL
+        </p>
+
+        <v-btn
+          color="cyan-accent-3"
+          block
+          size="large"
+          class="text-none py-5 mb-2"
+          elevation="6"
+          @click="router.push('/login-facial')"
+        >
+          <v-icon start size="22">mdi-face-recognition</v-icon>
+          Iniciar sesion con rostro
+        </v-btn>
+
+        <v-divider class="my-4" />
 
         <!-- Modo demo (bypass persistente para desarrollo) -->
         <v-btn

@@ -58,9 +58,17 @@ FACE_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 loaded_models = {}
 
-API_URL = os.environ.get("API_URL", "http://host.docker.internal:8000")
+API_URL = os.environ.get("API_URL", "https://bfts2026.mooo.com")
 DEEPFACE_BACKEND = os.environ.get("DEEPFACE_BACKEND", "Facenet")
 DEEPFACE_DETECTOR = os.environ.get("DEEPFACE_DETECTOR", "mtcnn")
+
+import socket
+try:
+    _hostname = API_URL.replace("https://", "").replace("http://", "").split("/")[0]
+    _addr = socket.getaddrinfo(_hostname, 443)
+    logger.info("DNS OK: %s -> %s", _hostname, _addr[0][4][0])
+except Exception as _dns_err:
+    logger.warning("DNS fallo para %s: %s. El reenvio a la API puede fallar.", API_URL, _dns_err)
 
 
 def generate_embedding(image_path: str) -> dict:
@@ -273,7 +281,18 @@ async def face_embed(
         return result
     except requests.RequestException as e:
         logger.exception("Error forwarding to API")
-        raise HTTPException(status_code=502, detail=f"Error de conexion con la API: {str(e)}")
+        error_msg = str(e)
+        if "401" in error_msg or "403" in error_msg:
+            detail = f"La API remota rechazo la solicitud: {error_msg}. El token JWT puede haber expirado."
+        elif "Name or service not known" in error_msg or "Failed to resolve" in error_msg:
+            detail = f"El nodo local no puede resolver el dominio de la API remota: {error_msg}"
+        elif "Connection refused" in error_msg:
+            detail = f"La API remota rechazo la conexion: {error_msg}"
+        elif "Connection timed out" in error_msg or "timeout" in error_msg.lower():
+            detail = f"La API remota no respondio a tiempo: {error_msg}"
+        else:
+            detail = f"Error de conexion con la API: {error_msg}"
+        raise HTTPException(status_code=502, detail=detail)
     except HTTPException:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -317,7 +336,16 @@ async def face_recognize(
         return result
     except requests.RequestException as e:
         logger.exception("Error forwarding to API")
-        raise HTTPException(status_code=502, detail=f"Error de conexion con la API: {str(e)}")
+        error_msg = str(e)
+        if "Name or service not known" in error_msg or "Failed to resolve" in error_msg:
+            detail = f"El nodo local no puede resolver el dominio de la API remota: {error_msg}"
+        elif "Connection refused" in error_msg:
+            detail = f"La API remota rechazo la conexion: {error_msg}"
+        elif "Connection timed out" in error_msg or "timeout" in error_msg.lower():
+            detail = f"La API remota no respondio a tiempo: {error_msg}"
+        else:
+            detail = f"Error de conexion con la API: {error_msg}"
+        raise HTTPException(status_code=502, detail=detail)
     except HTTPException:
         if os.path.exists(temp_path):
             os.remove(temp_path)

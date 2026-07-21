@@ -6,7 +6,7 @@ from datetime import datetime
 class PersonCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=255)
     apellido: str = Field(..., min_length=1, max_length=255)
-    email: Optional[str] = Field(None, max_length=255)
+    email: str = Field(..., max_length=255)
     metadata: Optional[dict[str, Any]] = None
 
 
@@ -19,6 +19,7 @@ class PersonResponse(BaseModel):
     has_faces: bool = False
     profile_image_url: str = ""
     metadata: Optional[dict[str, Any]] = None
+    keycloak_roles: list[str] = []
     created_at: str
     updated_at: str
 

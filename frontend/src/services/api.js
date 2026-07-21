@@ -102,6 +102,15 @@ export async function getPersons() {
   return data
 }
 
+export async function syncKeycloakPersons() {
+  try {
+    const { data } = await api.post('/persons/sync-keycloak')
+    return data
+  } catch {
+    return null
+  }
+}
+
 // GET /api/persons/me - Retorna la persona vinculada al token actual
 export async function getMyPerson() {
   try {
@@ -130,6 +139,16 @@ export async function recognizeFaceFromImage(imageBase64, threshold = 0.8) {
     image_base64: imageBase64,
     threshold
   })
+  return data
+}
+
+export async function registerFace(payload) {
+  const { data } = await api.post('/auth/register', payload)
+  return data
+}
+
+export async function facialLogin(payload) {
+  const { data } = await api.post('/auth/login/facial', payload)
   return data
 }
 

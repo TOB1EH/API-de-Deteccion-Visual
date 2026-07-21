@@ -134,6 +134,7 @@ services:
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
       KC_HOSTNAME: bfts2026.mooo.com
+      KC_HOSTNAME_URL: https://bfts2026.mooo.com/auth
       KC_HTTP_PORT: 8080
       KC_HTTP_ENABLED: "true"
       KC_HTTP_RELATIVE_PATH: /auth
@@ -172,8 +173,13 @@ services:
       SEAWEED_PUBLIC_URL: https://bfts2026.mooo.com/seaweed
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      FACIAL_JWT_SECRET: ${FACIAL_JWT_SECRET:-cambiar-en-produccion-clave-secreta-2026}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-abrambilla804@alumnos.iua.edu.ar}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:-abrambilla804@alumnos.iua.edu.ar}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-API Deteccion Visual}
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro

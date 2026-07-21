@@ -18,12 +18,15 @@
     />
     <v-text-field
       v-model="form.email"
-      label="Email"
+      label="Email *"
       type="email"
       prepend-inner-icon="mdi-email"
       :rules="[
-        v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || 'Email invalido'
+        v => !!v || 'El email es obligatorio',
+        v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || 'Email invalido'
       ]"
+      hint="Se creara un usuario en Keycloak con este email"
+      required
       class="mb-4"
     />
     <div class="d-flex ga-2 justify-end">
@@ -50,7 +53,7 @@ const emit = defineEmits(['submit', 'cancel'])
 const form = reactive({
   nombre: '',
   apellido: '',
-  email: ''
+  email: '',
 })
 
 watch(() => props.person, (val) => {
