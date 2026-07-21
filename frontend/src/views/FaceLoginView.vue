@@ -24,16 +24,16 @@
           <v-icon v-else size="96" color="grey" class="mb-3">mdi-account-circle</v-icon>
         </div>
 
-        <div class="d-flex ga-2 mb-4">
-          <v-btn variant="tonal" color="primary" block class="text-none" @click="triggerFileUpload">
+        <div class="d-flex flex-column flex-sm-row ga-2 mb-4">
+          <v-btn variant="tonal" color="primary" class="flex-grow-1 text-none" @click="triggerFileUpload">
             <v-icon start>mdi-camera-plus</v-icon>
             Subir foto
           </v-btn>
-          <v-btn v-if="!webcamActive" variant="tonal" color="cyan-accent-3" block class="text-none" @click="startWebcam">
+          <v-btn v-if="!webcamActive" variant="tonal" color="cyan-accent-3" class="flex-grow-1 text-none" @click="startWebcam">
             <v-icon start>mdi-webcam</v-icon>
             Usar webcam
           </v-btn>
-          <v-btn v-else variant="tonal" color="error" block class="text-none" @click="captureWebcam">
+          <v-btn v-else variant="tonal" color="error" class="flex-grow-1 text-none" @click="captureWebcam">
             <v-icon start>mdi-camera</v-icon>
             Capturar
           </v-btn>
