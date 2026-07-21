@@ -40,7 +40,7 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
 - Roles definidos: `admin`, `operator`, `viewer`
 - Permisos por endpoint:
   - **GET /api/models/**, **GET /api/frames/**, **GET /api/detections/{id}** -> admin/operator/viewer
-  - **GET /api/persons/** (listar/detalle) -> admin/operator (viewer no)
+  - **GET /api/persons/** (listar/detalle/me) -> admin/operator/viewer
   - **GET /api/models/{name}/download** -> admin/operator (viewer solo lectura)
   - **POST /api/detections** -> admin/operator
   - **POST /api/persons**, **PUT /api/persons/{id}** -> admin

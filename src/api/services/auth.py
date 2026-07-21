@@ -15,9 +15,14 @@ KEYCLOAK_INTERNAL_URL = os.getenv(
     "http://keycloak:8080",
 )
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "api-detection")
+KEYCLOAK_PUBLIC_URL = os.getenv(
+    "KEYCLOAK_PUBLIC_URL",
+    "https://bfts2026.mooo.com",
+)
 JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
 FACIAL_JWT_SECRET = os.getenv("FACIAL_JWT_SECRET", "facial-jwt-secret-change-in-production")
 FACIAL_JWT_ALGORITHM = "HS256"
+ISSUER_URL = f"{KEYCLOAK_PUBLIC_URL}/auth/realms/{KEYCLOAK_REALM}"
 
 PUBLIC_PATHS = [
     "/",
@@ -133,17 +138,17 @@ def verify_token(
                 token,
                 public_key,
                 algorithms=[Algorithms.RS256],
-                options={"verify_iss": False, "verify_aud": False},
+                issuer=ISSUER_URL,
+                audience="account",
+                options={"verify_iss": True, "verify_aud": False},
             )
         else:
-            # Sin kid: es token facial firmado con HS256
             payload = jwt.decode(
                 token,
                 FACIAL_JWT_SECRET,
                 algorithms=[FACIAL_JWT_ALGORITHM],
                 options={"verify_iss": False, "verify_aud": False},
             )
-
         realm_roles = payload.get("realm_access", {}).get("roles", [])
         return {
             "sub": payload.get("sub"),

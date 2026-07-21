@@ -6,6 +6,7 @@
 
 import Keycloak from 'keycloak-js'
 import { reactive } from 'vue'
+import axios from 'axios'
 
 // Estado reactivo global
 export const authState = reactive({
@@ -93,10 +94,48 @@ function extractUserFromToken(token) {
   }
 }
 
+async function createPersonIfMissing(token, user) {
+  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const baseURL = isLocalDev ? 'http://localhost:8000/api/' : 'https://bfts2026.mooo.com/api/'
+
+  try {
+    const resp = await axios.get(`${baseURL}persons/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (resp.data?.person_id) {
+      console.log('[Auth] Persona ya vinculada:', resp.data.person_id)
+      return
+    }
+  } catch (err) {
+    if (err.response?.status !== 404) {
+      console.warn('[Auth] Error al verificar persona:', err.message)
+      return
+    }
+  }
+
+  try {
+    const nombre = user.firstName || user.username?.split('@')[0] || 'Usuario'
+    const apellido = user.lastName || ''
+    const email = user.email || ''
+    console.log('[Auth] Creando persona automatica:', nombre, apellido)
+    await axios.post(
+      `${baseURL}persons/me`,
+      { nombre, apellido, email },
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    console.log('[Auth] Persona creada exitosamente')
+  } catch (err) {
+    console.warn('[Auth] No se pudo crear persona:', err.response?.data?.detail || err.message)
+  }
+}
+
 export const authService = {
   async init() {
      try {
        authState.loading = true
+       if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
+         history.replaceState(null, '', window.location.pathname)
+       }
        const initOptions = isLocalDev
          ? {}
          : {
@@ -104,19 +143,14 @@ export const authService = {
              silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
            }
        const authenticated = await keycloak.init(initOptions)
-       // Despues de que keycloak-js proceso la respuesta (codigo, token o error),
-       // limpiamos cualquier hash residual que haya quedado en la URL para que
-       // la vista se vea limpia (sin #error=login_required visible).
-       if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
-         history.replaceState(null, '', window.location.pathname)
-       }
       console.log('[Keycloak] init result - authenticated:', authenticated)
       if (authenticated) {
         authState.token = keycloak.token
         authState.user = extractUserFromToken(keycloak.token)
-        console.log('[Keycloak] user from token:', authState.user)
         authState.authenticated = true
         authState.loading = false
+        console.log('[Keycloak] user from token:', authState.user)
+        createPersonIfMissing(keycloak.token, authState.user)
         return
       }
     } catch (err) {

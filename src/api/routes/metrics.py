@@ -66,8 +66,10 @@ def _check_inference_server() -> bool:
 
 async def inference_server_healthcheck_loop(interval: int = 30):
     while True:
+        INFERENCE_SERVER_UP.set(0)
         is_up = await asyncio.to_thread(_check_inference_server)
-        INFERENCE_SERVER_UP.set(1 if is_up else 0)
+        if is_up:
+            INFERENCE_SERVER_UP.set(1)
         await asyncio.sleep(interval)
 
 

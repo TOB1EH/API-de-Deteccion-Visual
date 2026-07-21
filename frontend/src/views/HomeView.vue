@@ -179,7 +179,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getModels, getPersons, searchFrames } from '../services/api'
+import { getModels, getPersons, getMyPerson, searchFrames } from '../services/api'
 
 const router = useRouter()
 
@@ -241,6 +241,11 @@ onMounted(async () => {
   if (personsData.status === 'fulfilled' && personsData.value?.persons) {
     kpis.value[2].value = String(personsData.value.total || personsData.value.persons.length)
   } else {
+    // Si no tiene permisos para listar (viewer), intentar obtener su propia persona
+    const myPerson = await getMyPerson()
+    if (myPerson?.person_id) {
+      kpis.value[2].value = '1'
+    }
     console.warn('[HomeView] Error cargando personas:', personsData.reason)
   }
 
