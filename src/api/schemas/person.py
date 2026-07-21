@@ -7,7 +7,7 @@ class PersonCreate(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=255)
     apellido: str = Field(..., min_length=1, max_length=255)
     email: Optional[str] = Field(None, max_length=255)
-    password: Optional[str] = Field(None, min_length=6, max_length=255,
+    password: Optional[str] = Field(None, max_length=255,
                                     description="Contrasena para Keycloak. Si no se provee con email, se auto-genera una.")
     metadata: Optional[dict[str, Any]] = None
 
