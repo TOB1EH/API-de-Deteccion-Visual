@@ -170,6 +170,10 @@ services:
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
       FACIAL_JWT_SECRET: ${FACIAL_JWT_SECRET:-cambiar-en-produccion-clave-secreta-2026}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro
