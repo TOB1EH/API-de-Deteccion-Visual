@@ -97,13 +97,13 @@ export const authService = {
   async init() {
      try {
        authState.loading = true
-       const authenticated = await keycloak.init({
-         onLoad: 'check-sso',
-         // Desactiva el iframe de verificacion de 3rd-party cookies porque
-         // Keycloak 26.x en localhost causa timeout. El login funciona igual
-         // procesando el callback OAuth directamente desde la URL.
-         checkLoginIframe: false
-       })
+       const initOptions = isLocalDev
+         ? {}
+         : {
+             onLoad: 'check-sso',
+             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
+           }
+       const authenticated = await keycloak.init(initOptions)
        // Despues de que keycloak-js proceso la respuesta (codigo, token o error),
        // limpiamos cualquier hash residual que haya quedado en la URL para que
        // la vista se vea limpia (sin #error=login_required visible).
