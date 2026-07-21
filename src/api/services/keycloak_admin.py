@@ -54,6 +54,21 @@ def delete_keycloak_user(user_id: str) -> None:
         logger.warning("Error eliminando usuario Keycloak %s: %s", user_id, resp.status_code)
 
 
+def set_user_password(user_id: str, password: str) -> None:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"type": "password", "value": password, "temporary": False}
+    resp = requests.put(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/reset-password",
+        json=payload,
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        logger.error("Keycloak set password error %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+
+
 def create_keycloak_user(username: str, email: str, password: str) -> str:
     existing = find_user_by_email(email)
     if existing:
@@ -67,7 +82,6 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
         "emailVerified": True,
         "enabled": True,
         "requiredActions": [],
-        "credentials": [{"type": "password", "value": password, "temporary": False}],
     }
     resp = requests.post(
         f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users",
@@ -80,6 +94,13 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
     user_id = location.rstrip("/").split("/")[-1] if location else ""
     if not user_id:
         user_id = find_user_by_email(email) or ""
+
+    if user_id:
+        try:
+            set_user_password(user_id, password)
+        except Exception:
+            delete_keycloak_user(user_id)
+            raise
 
     return user_id
 
