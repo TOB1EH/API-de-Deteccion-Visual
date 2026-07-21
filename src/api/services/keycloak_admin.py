@@ -1,5 +1,6 @@
 import logging
 import os
+import secrets
 import requests
 from typing import Optional
 
@@ -173,7 +174,7 @@ def clear_user_required_actions(user_id: str) -> None:
 
 def create_keycloak_user(username: str, email: str, password: str | None = None,
                         send_email: bool = False,
-                        first_name: str = "", last_name: str = "") -> str:
+                        first_name: str = "", last_name: str = "") -> tuple[str, str | None]:
     existing = find_user_by_email(email)
     if existing:
         raise ValueError(f"El usuario {username} ya existe en Keycloak")
@@ -189,8 +190,6 @@ def create_keycloak_user(username: str, email: str, password: str | None = None,
         "enabled": True,
         "requiredActions": [],
     }
-    if send_email:
-        payload["requiredActions"] = ["UPDATE_PASSWORD"]
 
     resp = requests.post(
         f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users",
@@ -206,11 +205,14 @@ def create_keycloak_user(username: str, email: str, password: str | None = None,
 
     if user_id:
         if send_email:
+            temp_password = secrets.token_urlsafe(12)
             try:
-                execute_actions_email(user_id, ["UPDATE_PASSWORD"])
-            except Exception as e:
-                logger.warning("No se pudo enviar email a %s: %s", email, e)
-            return user_id
+                set_user_password(user_id, temp_password)
+                clear_user_required_actions(user_id)
+            except Exception:
+                delete_keycloak_user(user_id)
+                raise
+            return user_id, temp_password
         try:
             set_user_password(user_id, password)
             try:
@@ -221,7 +223,7 @@ def create_keycloak_user(username: str, email: str, password: str | None = None,
             delete_keycloak_user(user_id)
             raise
 
-    return user_id
+    return user_id, None
 
 
 def assign_realm_role_to_user(user_id: str, role_name: str) -> None:

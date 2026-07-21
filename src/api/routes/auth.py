@@ -247,7 +247,7 @@ async def register_face(request: RegisterFaceRequest):
     keycloak_password = request.password
 
     try:
-        keycloak_user_id = create_keycloak_user(
+        keycloak_user_id, _ = create_keycloak_user(
             username=request.email,
             email=request.email,
             password=keycloak_password,

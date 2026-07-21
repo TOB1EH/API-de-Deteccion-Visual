@@ -9,6 +9,7 @@ from ..services.keycloak_admin import (
     create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user,
     update_keycloak_user, get_user_realm_roles, list_keycloak_users,
 )
+from ..services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
         name = f"{request.nombre} {request.apellido}"
 
         try:
-            new_keycloak_id = create_keycloak_user(
+            new_keycloak_id, temp_password = create_keycloak_user(
                 username=request.email,
                 email=request.email,
                 send_email=True,
@@ -40,6 +41,22 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
             except Exception as e:
                 logger.warning("No se pudo asignar rol operator al usuario %s: %s", request.email, e)
             keycloak_user_id = new_keycloak_id
+
+            if temp_password:
+                send_email(
+                    to=request.email,
+                    subject="Credenciales de acceso - API Deteccion Visual",
+                    body=(
+                        f"Estimado/a {request.nombre} {request.apellido},\n\n"
+                        "Su cuenta ha sido creada en el sistema API Deteccion Visual.\n\n"
+                        "Sus credenciales de acceso son:\n"
+                        f"  Usuario: {request.email}\n"
+                        f"  Contrasena: {temp_password}\n\n"
+                        "Puede iniciar sesion en: https://bfts2026.mooo.com/\n\n"
+                        "Se recomienda cambiar la contrasena despues del primer inicio de sesion.\n\n"
+                        "Saludos,\nEquipo API Deteccion Visual"
+                    ),
+                )
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
