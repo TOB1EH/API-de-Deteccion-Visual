@@ -32,6 +32,8 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
                 username=request.email,
                 email=request.email,
                 send_email=True,
+                first_name=request.nombre,
+                last_name=request.apellido,
             )
             try:
                 assign_realm_role_to_user(new_keycloak_id, "operator")
@@ -255,6 +257,16 @@ async def create_my_person(request: PersonCreate, auth_data: dict = Depends(veri
         person_id = str(uuid4())
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
+
+        try:
+            update_keycloak_user(
+                keycloak_user_id,
+                first_name=request.nombre,
+                last_name=request.apellido,
+                email=request.email or "",
+            )
+        except Exception as e:
+            logger.warning("No se pudo actualizar nombre en Keycloak: %s", e)
 
         saved = db_service.create_person(
             person_id=person_id,

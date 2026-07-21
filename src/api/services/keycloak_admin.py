@@ -170,7 +170,8 @@ def clear_user_required_actions(user_id: str) -> None:
 
 
 def create_keycloak_user(username: str, email: str, password: str | None = None,
-                        send_email: bool = False) -> str:
+                        send_email: bool = False,
+                        first_name: str = "", last_name: str = "") -> str:
     existing = find_user_by_email(email)
     if existing:
         raise ValueError(f"El usuario {username} ya existe en Keycloak")
@@ -180,6 +181,8 @@ def create_keycloak_user(username: str, email: str, password: str | None = None,
     payload = {
         "username": username,
         "email": email,
+        "firstName": first_name,
+        "lastName": last_name,
         "emailVerified": True,
         "enabled": True,
         "requiredActions": [],
@@ -239,7 +242,10 @@ def assign_realm_role_to_user(user_id: str, role_name: str) -> None:
         headers=headers,
         timeout=10,
     )
+    if resp.status_code >= 400:
+        logger.error("Error asignando rol %s a usuario %s: %s %s", role_name, user_id, resp.status_code, resp.text)
     resp.raise_for_status()
+    logger.info("Rol %s asignado a usuario %s correctamente", role_name, user_id)
 
 
 def get_user_token(email: str, password: str) -> dict:
