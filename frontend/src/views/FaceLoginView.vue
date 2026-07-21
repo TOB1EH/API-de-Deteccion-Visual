@@ -49,10 +49,7 @@
           Iniciar sesion
         </v-btn>
 
-        <div class="text-center mt-4">
-          <span class="text-caption text-grey">No tenes cuenta? </span>
-          <router-link to="/registro-facial" class="text-cyan-accent-3 text-caption">Registrate</router-link>
-        </div>
+
       </v-card>
     </v-col>
   </v-row>
