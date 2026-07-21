@@ -176,13 +176,19 @@ async def delete_person(person_id: str):
         500 si hay error de base de datos
     """
     try:
-        # Verificar que la persona existe
         existing = db_service.get_person(person_id)
         if not existing:
             raise HTTPException(
                 status_code=404,
                 detail=f"Persona {person_id} no encontrada"
             )
+
+        keycloak_user_id = existing.get("keycloak_user_id")
+        if keycloak_user_id:
+            try:
+                delete_keycloak_user(keycloak_user_id)
+            except Exception as e:
+                logger.warning("No se pudo eliminar usuario Keycloak %s: %s", keycloak_user_id, e)
 
         deleted = db_service.delete_person(person_id)
 

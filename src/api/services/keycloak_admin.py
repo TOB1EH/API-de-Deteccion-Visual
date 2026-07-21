@@ -79,7 +79,8 @@ def get_user_realm_roles(user_id: str) -> list[str]:
     if resp.status_code >= 400:
         logger.warning("Error fetching roles for user %s: %s", user_id, resp.status_code)
         return []
-    return [r["name"] for r in resp.json()]
+    roles = resp.json()
+    return [r["name"] for r in roles if not r["name"].startswith("default-roles-")]
 
 
 def execute_actions_email(user_id: str, actions: list[str] | None = None) -> None:
