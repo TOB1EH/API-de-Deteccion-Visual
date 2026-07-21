@@ -88,13 +88,15 @@ def execute_actions_email(user_id: str, actions: list[str] | None = None) -> Non
         actions = ["UPDATE_PASSWORD"]
     token = _get_admin_token()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {
-        "actions": actions,
+    params = {
         "lifespan": 43200,
+        "redirect_uri": "https://bfts2026.mooo.com/",
+        "client_id": "api-backend",
     }
     resp = requests.put(
         f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/execute-actions-email",
-        json=payload,
+        json=actions,
+        params=params,
         headers=headers,
         timeout=10,
     )
