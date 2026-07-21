@@ -75,6 +75,17 @@
           Iniciar sesion con rostro
         </v-btn>
 
+        <v-btn
+          variant="tonal"
+          color="cyan-darken-1"
+          block
+          class="text-none mb-4"
+          @click="router.push('/registro-facial')"
+        >
+          <v-icon start size="18">mdi-account-plus</v-icon>
+          Registrarse con reconocimiento facial
+        </v-btn>
+
         <v-divider class="my-4" />
 
         <!-- Modo demo (bypass persistente para desarrollo) -->

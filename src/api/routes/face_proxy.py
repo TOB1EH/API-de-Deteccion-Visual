@@ -159,6 +159,26 @@ async def create_face_embedding(person_id: str, request: FaceEmbedRequest):
         conn.close()
 
         logger.info("Embedding %s persistido para persona %s", embedding_id, person_id)
+
+        try:
+            kc_conn = db_service.get_connection()
+            kc_cur = kc_conn.cursor(cursor_factory=RealDictCursor)
+            kc_cur.execute(
+                "SELECT keycloak_user_id FROM persons WHERE person_id = %s",
+                (person_id,),
+            )
+            kc_row = kc_cur.fetchone()
+            kc_cur.close()
+            kc_conn.close()
+            if kc_row and kc_row.get("keycloak_user_id"):
+                from ..services.keycloak_admin import get_user_roles, assign_realm_role_to_user
+                kc_roles = get_user_roles(kc_row["keycloak_user_id"])
+                if "viewer" in kc_roles and "operator" not in kc_roles:
+                    assign_realm_role_to_user(kc_row["keycloak_user_id"], "operator")
+                    logger.info("Persona %s upgradeda de viewer a operator por subir embeddings", person_id)
+        except Exception:
+            logger.warning("No se pudo verificar/upgradear rol para persona %s", person_id)
+
         return FaceEmbedResponse(
             person_id=person_id,
             processed_images=1,

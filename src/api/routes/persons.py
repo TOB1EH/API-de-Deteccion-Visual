@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
 from ..services.auth import require_role, verify_token
-from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user
+from ..services.keycloak_admin import create_keycloak_user, delete_keycloak_user, assign_realm_role_to_user, get_user_roles
 
 logger = logging.getLogger(__name__)
 
@@ -128,14 +128,29 @@ async def update_person(person_id: str, request: PersonUpdate):
                 detail="Error al actualizar la persona en la base de datos"
             )
 
+        kc_id = existing.get("keycloak_user_id")
+        current_role = None
+        if kc_id and request.role:
+            try:
+                current_roles = get_user_roles(kc_id)
+                for r in ("admin", "operator", "viewer"):
+                    if r in current_roles:
+                        current_role = r
+                        break
+                if current_role != request.role:
+                    assign_realm_role_to_user(kc_id, request.role)
+            except Exception:
+                logger.warning("No se pudo actualizar el rol en Keycloak para %s", person_id)
+
         return PersonResponse(
             person_id=person_id,
             nombre=request.nombre,
             apellido=request.apellido,
             email=request.email,
-            keycloak_user_id=existing.get("keycloak_user_id"),
+            keycloak_user_id=kc_id,
             has_faces=existing.get("has_faces", False),
             profile_image_url=request.profile_image_url or existing.get("profile_image_url", ""),
+            role=request.role or current_role,
             metadata=request.metadata or {},
             created_at=existing["created_at"],
             updated_at=timestamp
@@ -229,7 +244,18 @@ async def get_person(person_id: str):
                 status_code=404,
                 detail=f"Persona {person_id} no encontrada"
             )
-        return PersonResponse(**person)
+        resp = PersonResponse(**person)
+        kc_id = person.get("keycloak_user_id")
+        if kc_id:
+            try:
+                roles = get_user_roles(kc_id)
+                for r in ("admin", "operator", "viewer"):
+                    if r in roles:
+                        resp.role = r
+                        break
+            except Exception:
+                logger.warning("No se pudieron obtener roles de Keycloak para %s", person_id)
+        return resp
     except HTTPException:
         raise
     except Exception as e:

@@ -29,6 +29,19 @@
       required
       class="mb-4"
     />
+    <v-select
+      v-if="person"
+      v-model="form.role"
+      label="Rol"
+      :items="[
+        { title: 'Operador', value: 'operator' },
+        { title: 'Visitante', value: 'viewer' }
+      ]"
+      prepend-inner-icon="mdi-shield-account"
+      hint="Define los permisos del usuario"
+      persistent-hint
+      class="mb-4"
+    />
     <div class="d-flex ga-2 justify-end">
       <v-btn variant="tonal" @click="$emit('cancel')" class="text-none">
         Cancelar
@@ -54,6 +67,7 @@ const form = reactive({
   nombre: '',
   apellido: '',
   email: '',
+  role: null,
 })
 
 watch(() => props.person, (val) => {
@@ -61,10 +75,12 @@ watch(() => props.person, (val) => {
     form.nombre = val.nombre || ''
     form.apellido = val.apellido || ''
     form.email = val.email || ''
+    form.role = val.role || null
   } else {
     form.nombre = ''
     form.apellido = ''
     form.email = ''
+    form.role = null
   }
 }, { immediate: true })
 

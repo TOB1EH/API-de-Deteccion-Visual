@@ -133,6 +133,20 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
     return user_id
 
 
+def get_user_roles(user_id: str) -> list[str]:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = requests.get(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/role-mappings/realm",
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code == 404:
+        return []
+    resp.raise_for_status()
+    return [r["name"] for r in resp.json()]
+
+
 def assign_realm_role_to_user(user_id: str, role_name: str) -> None:
     token = _get_admin_token()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}

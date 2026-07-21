@@ -30,6 +30,11 @@ const routes = [
     component: () => import('../views/LoginView.vue')
   },
   {
+    path: '/registro-facial',
+    name: 'RegisterFace',
+    component: () => import('../views/RegisterFaceView.vue')
+  },
+  {
     path: '/login-facial',
     name: 'FaceLogin',
     component: () => import('../views/FaceLoginView.vue')
@@ -112,7 +117,7 @@ router.beforeEach((to, from, next) => {
     return
   }
   // Las paginas de login y registro facial siempre son accesibles
-  if (to.path === '/login' || to.path === '/login-facial') {
+  if (to.path === '/login' || to.path === '/registro-facial' || to.path === '/login-facial') {
     next()
     return
   }
