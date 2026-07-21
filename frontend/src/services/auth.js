@@ -97,19 +97,22 @@ export const authService = {
   async init() {
      try {
        authState.loading = true
-       const authenticated = await keycloak.init({
-         onLoad: 'check-sso',
-         // Desactiva el iframe de verificacion de 3rd-party cookies porque
-         // Keycloak 26.x en localhost causa timeout. El login funciona igual
-         // procesando el callback OAuth directamente desde la URL.
-         checkLoginIframe: false
-       })
-       // Despues de que keycloak-js proceso la respuesta (codigo, token o error),
-       // limpiamos cualquier hash residual que haya quedado en la URL para que
-       // la vista se vea limpia (sin #error=login_required visible).
+       // Si la URL tiene un hash de error residual de un redirect previo
+       // (#error=login_required), lo limpiamos ANTES de init para que
+       // keycloak-js no intente procesarlo como callback OAuth.
        if (window.location.hash && !window.location.hash.includes('code=') && !window.location.hash.includes('access_token=')) {
          history.replaceState(null, '', window.location.pathname)
        }
+       // En local (Vite dev) no usamos onLoad para evitar redirect loop.
+       // En remoto usamos check-sso con silentCheckSsoRedirectUri para
+       // detectar sesion existente sin redirigir la pagina.
+       const initOptions = isLocalDev
+         ? {}
+         : {
+             onLoad: 'check-sso',
+             silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
+           }
+       const authenticated = await keycloak.init(initOptions)
       console.log('[Keycloak] init result - authenticated:', authenticated)
       if (authenticated) {
         authState.token = keycloak.token
