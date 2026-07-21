@@ -161,7 +161,7 @@ services:
       INFERENCE_SERVER_URL: http://inference-server:8000
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
-      KEYCLOAK_PUBLIC_URL: http://localhost
+      KEYCLOAK_PUBLIC_URL: http://localhost:8081
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
     volumes:
