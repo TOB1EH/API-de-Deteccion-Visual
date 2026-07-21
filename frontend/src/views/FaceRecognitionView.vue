@@ -93,15 +93,13 @@
           </v-btn>
           <v-btn
             color="primary"
-            size="x-large"
-            block
-            class="text-none py-5"
+            class="text-none flex-grow-1"
             :loading="loading"
             :disabled="!imageFile"
             @click="recognizeFace"
             elevation="3"
           >
-            <v-icon start size="24">mdi-face-recognition</v-icon>
+            <v-icon start>mdi-face-recognition</v-icon>
             Reconocer rostro
           </v-btn>
         </div>
