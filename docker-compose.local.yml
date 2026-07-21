@@ -128,6 +128,7 @@ services:
       KC_HTTP_RELATIVE_PATH: /auth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
     ports:
       - "8081:8080"
     volumes:

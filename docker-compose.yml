@@ -141,6 +141,7 @@ services:
       KC_HOSTNAME_STRICT: "false"
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
     ports:
       - "8081:8080"
     volumes:
