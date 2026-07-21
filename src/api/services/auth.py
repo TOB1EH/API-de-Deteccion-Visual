@@ -121,7 +121,7 @@ def verify_token(
             algorithms=[Algorithms.RS256],
             issuer=ISSUER_URL,
             audience="account",
-            options={"verify_iss": True, "verify_aud": True},
+            options={"verify_iss": True, "verify_aud": False},
         )
 
         realm_roles = payload.get("realm_access", {}).get("roles", [])

@@ -161,6 +161,7 @@ services:
       INFERENCE_SERVER_URL: http://inference-server:8000
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro
