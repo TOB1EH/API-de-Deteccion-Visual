@@ -143,8 +143,9 @@
   "otpPolicyPeriod": 30,
   "otpPolicyInitialCounter": 0,
   "otpPolicyLookAheadWindow": 1,
-  "internationalizationEnabled": false,
-  "supportedLocales": [],
+  "internationalizationEnabled": true,
+  "defaultLocale": "es",
+  "supportedLocales": ["es", "en"],
   "browserSecurityHeaders": {
     "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
     "xContentTypeOptions": "nosniff",
