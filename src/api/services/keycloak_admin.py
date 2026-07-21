@@ -69,6 +69,30 @@ def set_user_password(user_id: str, password: str) -> None:
     resp.raise_for_status()
 
 
+def clear_user_required_actions(user_id: str) -> None:
+    token = _get_admin_token()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    resp = requests.get(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        headers=headers,
+        timeout=10,
+    )
+    resp.raise_for_status()
+    user = resp.json()
+    if not user.get("requiredActions"):
+        return
+    user["requiredActions"] = []
+    resp = requests.put(
+        f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{user_id}",
+        json=user,
+        headers=headers,
+        timeout=10,
+    )
+    if resp.status_code >= 400:
+        logger.error("Keycloak clear requiredActions error %s: %s", resp.status_code, resp.text)
+    resp.raise_for_status()
+
+
 def create_keycloak_user(username: str, email: str, password: str) -> str:
     existing = find_user_by_email(email)
     if existing:
@@ -98,6 +122,10 @@ def create_keycloak_user(username: str, email: str, password: str) -> str:
     if user_id:
         try:
             set_user_password(user_id, password)
+            try:
+                clear_user_required_actions(user_id)
+            except Exception as e:
+                logger.warning("No se pudieron limpiar requiredActions del usuario %s: %s", user_id, e)
         except Exception:
             delete_keycloak_user(user_id)
             raise
