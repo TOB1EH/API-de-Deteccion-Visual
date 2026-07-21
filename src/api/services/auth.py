@@ -19,6 +19,8 @@ KEYCLOAK_PUBLIC_URL = os.getenv(
     "KEYCLOAK_PUBLIC_URL",
     "https://bfts2026.mooo.com",
 )
+KEYCLOAK_ADMIN_USER = os.getenv("KEYCLOAK_ADMIN", "admin")
+KEYCLOAK_ADMIN_PASSWORD = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "admin123")
 JWKS_URL = f"{KEYCLOAK_INTERNAL_URL}/auth/realms/{KEYCLOAK_REALM}/protocol/openid-connect/certs"
 ISSUER_URL = f"{KEYCLOAK_PUBLIC_URL}/auth/realms/{KEYCLOAK_REALM}"
 
@@ -187,3 +189,39 @@ def require_role(roles: list[str]):
             )
         return auth_data
     return _role_checker
+
+
+def delete_keycloak_user(keycloak_user_id: str):
+    if not keycloak_user_id:
+        logger.warning("Sin keycloak_user_id, se omite borrado en Keycloak")
+        return
+
+    try:
+        token_resp = requests.post(
+            f"{KEYCLOAK_INTERNAL_URL}/auth/realms/master/protocol/openid-connect/token",
+            data={
+                "client_id": "admin-cli",
+                "username": KEYCLOAK_ADMIN_USER,
+                "password": KEYCLOAK_ADMIN_PASSWORD,
+                "grant_type": "password",
+            },
+            timeout=5,
+        )
+        token_resp.raise_for_status()
+        admin_token = token_resp.json()["access_token"]
+
+        del_resp = requests.delete(
+            f"{KEYCLOAK_INTERNAL_URL}/auth/admin/realms/{KEYCLOAK_REALM}/users/{keycloak_user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            timeout=5,
+        )
+
+        if del_resp.status_code == 204:
+            logger.info("Usuario %s eliminado de Keycloak", keycloak_user_id)
+        elif del_resp.status_code == 404:
+            logger.warning("Usuario %s no existe en Keycloak (ya eliminado)", keycloak_user_id)
+        else:
+            del_resp.raise_for_status()
+
+    except requests.RequestException as e:
+        logger.error("Error eliminando usuario %s de Keycloak: %s", keycloak_user_id, e)
