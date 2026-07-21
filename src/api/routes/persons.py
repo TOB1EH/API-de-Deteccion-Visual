@@ -25,25 +25,22 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
         keycloak_user_id = auth_data.get("sub")
         timestamp = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         name = f"{request.nombre} {request.apellido}"
-        auth_password = None
-
-        if request.email:
-            password = request.password or str(secrets.randbelow(10**8)).zfill(8)
+        password = str(secrets.randbelow(10**8)).zfill(8)
+        try:
+            new_keycloak_id = create_keycloak_user(
+                username=request.email,
+                email=request.email,
+                password=password,
+            )
             try:
-                new_keycloak_id = create_keycloak_user(
-                    username=request.email,
-                    email=request.email,
-                    password=password,
-                )
-                try:
-                    assign_realm_role_to_user(new_keycloak_id, "viewer")
-                except Exception as e:
-                    logger.warning("No se pudo asignar rol viewer al usuario %s: %s", request.email, e)
+                assign_realm_role_to_user(new_keycloak_id, "operator")
+            except Exception as e:
+                logger.warning("No se pudo asignar rol operator al usuario %s: %s", request.email, e)
 
-                keycloak_user_id = new_keycloak_id
-                auth_password = password
-            except ValueError as e:
-                raise HTTPException(status_code=409, detail=str(e))
+            keycloak_user_id = new_keycloak_id
+            auth_password = password
+        except ValueError as e:
+            raise HTTPException(status_code=409, detail=str(e))
 
         saved = db_service.create_person(
             person_id=person_id,
