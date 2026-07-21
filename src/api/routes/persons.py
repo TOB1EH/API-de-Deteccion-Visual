@@ -4,7 +4,7 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from ..schemas.person import PersonCreate, PersonUpdate, PersonResponse, PersonListResponse
 from ..services.db_service import db_service
-from ..services.auth import require_role, verify_token
+from ..services.auth import require_role, verify_token, delete_keycloak_user
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,7 @@ async def delete_person(person_id: str):
                 detail=f"Persona {person_id} no encontrada"
             )
 
+        keycloak_user_id = existing.get("keycloak_user_id")
         deleted = db_service.delete_person(person_id)
 
         if not deleted:
@@ -160,6 +161,9 @@ async def delete_person(person_id: str):
                 status_code=500,
                 detail="Error al eliminar la persona de la base de datos"
             )
+
+        # Eliminar el usuario vinculado de Keycloak (si existe)
+        delete_keycloak_user(keycloak_user_id)
 
         return None
 
@@ -173,12 +177,8 @@ async def delete_person(person_id: str):
         )
 
 
-<<<<<<< HEAD
 @router.get("/me", response_model=PersonResponse,
             dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
-=======
-@router.get("/me", response_model=PersonResponse)
->>>>>>> 60a55bc (crear un usario y conectarlo con personas)
 async def get_my_person(auth_data: dict = Depends(verify_token)):
     """
     Retorna la persona vinculada al usuario autenticado (segun keycloak_user_id).

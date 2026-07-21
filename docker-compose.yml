@@ -171,6 +171,8 @@ services:
       SEAWEED_PUBLIC_URL: https://bfts2026.mooo.com/seaweed
       # URL del inference-server para inferencia interna (orquestador)
       INFERENCE_SERVER_URL: http://inference-server:8000
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro

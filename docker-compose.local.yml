@@ -162,6 +162,8 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-api-detection}
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_PUBLIC_URL: http://localhost
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin123}
     volumes:
       - ./models/local:/app/models/local:ro
       - ./client:/app/client:ro
