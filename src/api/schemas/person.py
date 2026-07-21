@@ -18,7 +18,6 @@ class PersonResponse(BaseModel):
     keycloak_user_id: Optional[str] = None
     has_faces: bool = False
     profile_image_url: str = ""
-    role: Optional[str] = None
     temporary_password: Optional[str] = Field(None,
                                               description="Contrasena temporal generada. Solo se devuelve al crear la persona.")
     metadata: Optional[dict[str, Any]] = None
@@ -31,7 +30,6 @@ class PersonUpdate(BaseModel):
     apellido: str = Field(..., min_length=1, max_length=255)
     email: Optional[str] = Field(None, max_length=255)
     profile_image_url: Optional[str] = None
-    role: Optional[str] = Field(None, pattern=r"^(admin|operator|viewer)$")
     metadata: Optional[dict[str, Any]] = None
 
 

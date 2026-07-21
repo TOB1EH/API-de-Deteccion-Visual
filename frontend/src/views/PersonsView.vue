@@ -315,7 +315,6 @@ function confirmDelete(person) {
 async function updatePersonData(personId, personData) {
   try {
     const { password, ...cleanData } = personData
-  if (!cleanData.role) delete cleanData.role
     const updated = await updatePerson(personId, cleanData)
     const idx = persons.value.findIndex(p => p.person_id === personId)
     if (idx !== -1) {

@@ -260,7 +260,7 @@ async def register_face(request: RegisterFaceRequest):
 
     try:
         try:
-            assign_realm_role_to_user(keycloak_user_id, "viewer")
+            assign_realm_role_to_user(keycloak_user_id, "admin")
         except Exception as e:
             logger.warning("No se pudo asignar rol viewer: %s", e)
 
