@@ -143,6 +143,8 @@ export const authService = {
          ? {}
          : {
              onLoad: 'check-sso',
+             checkLoginIframe: false,
+             silentCheckSsoFallback: true,
              silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
            }
        const authenticated = await keycloak.init(initOptions)
@@ -178,6 +180,15 @@ export const authService = {
       try {
         const payload = JSON.parse(atob(storedToken.split('.')[1]))
         if (payload.exp * 1000 > Date.now()) {
+          const expiresIn = payload.exp * 1000 - Date.now()
+          if (expiresIn < 5 * 60 * 1000 && expiresIn > 0) {
+            console.log('[Auth Debug] facial_token por expirar, redirigiendo a login facial para refrescar')
+            localStorage.removeItem('facial_token')
+            authState.authenticated = false
+            authState.loading = false
+            window.location.href = '/login-facial'
+            return
+          }
           authState.token = storedToken
           authState.user = extractUserFromToken(storedToken)
           authState.authenticated = true
