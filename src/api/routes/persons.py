@@ -61,17 +61,18 @@ async def create_person(request: PersonCreate, auth_data: dict = Depends(verify_
                 detail="Error al crear la persona en la base de datos"
             )
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=keycloak_user_id,
-            metadata=request.metadata or {},
-            created_at=timestamp,
-            updated_at=timestamp,
-            profile_image_url="",
-        )
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "metadata": request.metadata or {},
+            "created_at": timestamp,
+            "updated_at": timestamp,
+            "profile_image_url": "",
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
@@ -138,18 +139,19 @@ async def update_person(person_id: str, request: PersonUpdate):
             except Exception as e:
                 logger.warning("No se pudo actualizar usuario Keycloak %s: %s", keycloak_user_id, e)
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=keycloak_user_id,
-            has_faces=existing.get("has_faces", False),
-            profile_image_url=request.profile_image_url or existing.get("profile_image_url", ""),
-            metadata=request.metadata or {},
-            created_at=existing["created_at"],
-            updated_at=timestamp
-        )
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "has_faces": existing.get("has_faces", False),
+            "profile_image_url": request.profile_image_url or existing.get("profile_image_url", ""),
+            "metadata": request.metadata or {},
+            "created_at": existing["created_at"],
+            "updated_at": timestamp,
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
@@ -282,16 +284,17 @@ async def create_my_person(request: PersonCreate, auth_data: dict = Depends(veri
                 detail="Error al crear la persona en la base de datos"
             )
 
-        return PersonResponse(
-            person_id=person_id,
-            nombre=request.nombre,
-            apellido=request.apellido,
-            email=request.email,
-            keycloak_user_id=keycloak_user_id,
-            metadata=request.metadata or {},
-            created_at=timestamp,
-            updated_at=timestamp
-        )
+        person_data = {
+            "person_id": person_id,
+            "nombre": request.nombre,
+            "apellido": request.apellido,
+            "email": request.email,
+            "keycloak_user_id": keycloak_user_id,
+            "metadata": request.metadata or {},
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+        return PersonResponse(**_enrich_person_with_roles(person_data))
 
     except HTTPException:
         raise
