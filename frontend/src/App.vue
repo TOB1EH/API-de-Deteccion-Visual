@@ -14,19 +14,21 @@
 
       <v-spacer />
 
-      <v-btn
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        :variant="isActive(item.to) ? 'tonal' : 'text'"
-        class="text-none mx-1"
-        :class="{ 'font-weight-medium': isActive(item.to) }"
-        color="primary"
-        size="small"
-      >
-        <v-icon start size="20">{{ item.icon }}</v-icon>
-        {{ item.label }}
-      </v-btn>
+      <template v-if="route.name !== 'FaceLogin'">
+        <v-btn
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          :variant="isActive(item.to) ? 'tonal' : 'text'"
+          class="text-none mx-1"
+          :class="{ 'font-weight-medium': isActive(item.to) }"
+          color="primary"
+          size="small"
+        >
+          <v-icon start size="20">{{ item.icon }}</v-icon>
+          {{ item.label }}
+        </v-btn>
+      </template>
 
       <!-- Usuario logueado, rol y logout -->
       <template v-if="authState.authenticated && authState.user">
