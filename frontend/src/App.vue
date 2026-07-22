@@ -85,7 +85,7 @@ import LocalServerStatus from './components/LocalServerStatus.vue'
 const route = useRoute()
 const router = useRouter()
 
-const showAppBar = computed(() => route.name !== 'Login')
+const showAppBar = computed(() => route.name !== 'Login' && route.name !== 'Landing')
 
 function doLogout() {
   authService.logout()

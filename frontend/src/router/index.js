@@ -11,7 +11,8 @@ import { authState, hasAnyRole, isAdmin } from '../services/auth'
 const routes = [
   {
     path: '/',
-    redirect: '/home'
+    name: 'Landing',
+    component: () => import('../views/LandingView.vue')
   },
   {
     path: '/home',
@@ -111,8 +112,8 @@ router.beforeEach((to, from, next) => {
     next()
     return
   }
-  // Las paginas de login y registro facial siempre son accesibles
-  if (to.path === '/login' || to.path === '/login-facial') {
+  // La landing page, login y registro facial siempre son accesibles
+  if (to.name === 'Landing' || to.path === '/login' || to.path === '/login-facial') {
     next()
     return
   }
