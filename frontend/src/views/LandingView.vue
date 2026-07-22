@@ -3,9 +3,6 @@
     <section class="hero-section">
       <v-container>
         <div class="hero-content">
-          <v-avatar size="80" color="cyan-accent-3" class="mb-6" variant="tonal">
-            <v-icon size="40" color="cyan-accent-3">mdi-shield-eye</v-icon>
-          </v-avatar>
           <h1 class="hero-title">
             <span class="text-cyan-accent-3">API</span> Deteccion Visual
           </h1>
@@ -237,7 +234,7 @@ const techStack = [
   { name: 'Keycloak', icon: 'mdi-shield-key', color: 'orange-accent-3' },
   { name: 'YOLO', icon: 'mdi-brain', color: 'red-accent-3' },
   { name: 'SeaweedFS', icon: 'mdi-server', color: 'teal-accent-3' },
-  { name: 'Nginx', icon: 'mdi-proxy', color: 'green-darken-2' },
+  { name: 'Nginx', icon: 'mdi-server', color: 'green-darken-2' },
   { name: 'Docker', icon: 'mdi-docker', color: 'blue-darken-2' },
 ]
 

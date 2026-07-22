@@ -9,9 +9,6 @@
       >
         <!-- Cabecera -->
         <div class="text-center mb-6">
-          <v-avatar size="72" color="cyan-accent-3" class="mb-4" variant="tonal">
-            <v-icon size="36" color="cyan-accent-3">mdi-shield-eye</v-icon>
-          </v-avatar>
           <h1 class="text-h5 font-weight-bold tracking-wide text-white">
             <span class="text-cyan-accent-3">API</span> Deteccion Visual
           </h1>
