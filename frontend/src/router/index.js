@@ -23,7 +23,7 @@ const routes = [
     path: '/monitoreo',
     name: 'Monitoreo',
     component: () => import('../views/MonitoreoView.vue'),
-    meta: { roles: ['admin', 'operator'] }
+    meta: { roles: ['admin'] }
   },
   {
     path: '/login',
