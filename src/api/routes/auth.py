@@ -24,6 +24,7 @@ import base64
 import io
 import logging
 import secrets
+import requests
 from uuid import uuid4
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
