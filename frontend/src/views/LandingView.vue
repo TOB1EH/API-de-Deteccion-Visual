@@ -102,13 +102,15 @@
         </p>
         <v-row class="mt-6" justify="center">
           <v-col cols="12" md="5">
-            <v-card variant="outlined" class="pa-6 text-center" :style="{ borderColor: 'rgba(255, 82, 82, 0.3)' }">
-              <v-icon size="48" color="error" class="mb-3">mdi-alert-circle</v-icon>
-              <h3 class="text-h6 font-weight-bold mb-2">Nodo Desconectado</h3>
-              <v-chip color="error" variant="tonal" size="small" class="mb-4">
-                <v-icon start size="14">mdi-alert-circle</v-icon>
-                Nodo local: desconectado
-              </v-chip>
+            <v-card variant="outlined" class="pa-4 text-center" :style="{ borderColor: 'rgba(255, 82, 82, 0.3)' }">
+              <v-img
+                src="/img/nodo-desconectado.png"
+                max-height="120"
+                contain
+                class="mb-3"
+                style="border-radius: 8px;"
+              />
+              <h3 class="text-h6 font-weight-bold mb-1">Nodo Desconectado</h3>
               <p class="text-body-2 text-grey-lighten-1">
                 El servidor local no esta corriendo. Descarga y ejecuta el script
                 para habilitar reconocimiento facial.
@@ -116,13 +118,15 @@
             </v-card>
           </v-col>
           <v-col cols="12" md="5">
-            <v-card variant="outlined" class="pa-6 text-center" :style="{ borderColor: 'rgba(0, 200, 83, 0.3)' }">
-              <v-icon size="48" color="success" class="mb-3">mdi-check-circle</v-icon>
-              <h3 class="text-h6 font-weight-bold mb-2">Nodo Conectado</h3>
-              <v-chip color="success" variant="tonal" size="small" class="mb-4">
-                <v-icon start size="14">mdi-check-circle</v-icon>
-                Nodo local: conectado
-              </v-chip>
+            <v-card variant="outlined" class="pa-4 text-center" :style="{ borderColor: 'rgba(0, 200, 83, 0.3)' }">
+              <v-img
+                src="/img/nodo-conectado.png"
+                max-height="120"
+                contain
+                class="mb-3"
+                style="border-radius: 8px;"
+              />
+              <h3 class="text-h6 font-weight-bold mb-1">Nodo Conectado</h3>
               <p class="text-body-2 text-grey-lighten-1">
                 El servidor local esta activo. Puedes usar inicio de sesion facial
                 y registro biometrico.
