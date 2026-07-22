@@ -46,6 +46,7 @@ Todos los servicios S1-S5.3 implementados, desplegados y funcionales:
   - **POST /api/persons**, **PUT /api/persons/{id}** -> admin
   - **DELETE /api/persons/{id}** -> admin
   - **POST /api/persons/{id}/face-embed**, **POST /api/persons/{id}/embeddings**, **POST /api/face-recognition** -> admin
+  - **POST /api/detections** -> admin/operator/viewer (antes solo admin/operator)/viewer (antes solo admin/operator)
 
 ### Stack tecnologico
 

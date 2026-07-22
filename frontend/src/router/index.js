@@ -36,11 +36,10 @@ const routes = [
     component: () => import('../views/FaceLoginView.vue')
   },
   {
-    // Cargar imagen: solo admin y operator pueden procesar imagenes
+    // Cargar imagen: cualquier usuario autenticado puede procesar imagenes
     path: '/cargar',
     name: 'Cargar',
-    component: () => import('../views/DashboardView.vue'),
-    meta: { roles: ['admin', 'operator'] }
+    component: () => import('../views/DashboardView.vue')
   },
   {
     path: '/buscar',

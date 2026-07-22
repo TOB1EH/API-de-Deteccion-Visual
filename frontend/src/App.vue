@@ -94,7 +94,7 @@ function doLogout() {
 // Items de navegacion con roles requeridos (undefined = cualquier rol autenticado)
 const allNavItems = [
   { to: '/home', icon: 'mdi-view-dashboard', label: 'Inicio' },
-  { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar', roles: ['admin', 'operator'] },
+  { to: '/cargar', icon: 'mdi-cloud-upload', label: 'Cargar' },
   { to: '/buscar', icon: 'mdi-magnify', label: 'Buscar' },
   { to: '/personas', icon: 'mdi-account-group', label: 'Personas', roles: ['admin', 'operator'] },
   { to: '/facial', icon: 'mdi-face-recognition', label: 'Facial', roles: ['admin'] },

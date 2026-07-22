@@ -48,8 +48,8 @@ class DetectionRequest(BaseModel):
 
     image_base64: str                                # Imagen codificada en base64
     model_id: str                                    # ID del modelo utilizado para la detección
-    latitude: float                                  # Latitud de la ubicación donde se tomó la imagen
-    longitude: float                                 # Longitud de la ubicación donde se tomó la imagen
+    latitude: Optional[float] = None                 # Latitud (opcional)
+    longitude: Optional[float] = None                # Longitud (opcional)
     detections: Optional[List[SingleDetectionRequest]] = None  # Opcional: si no se envian, la API las calcula
     confidence: Optional[float] = Field(default=0.25, ge=0, le=1)  # Umbral de confianza para inferencia (default: 0.25)
     metadata: Optional[MetadataSchema] = None        # Metadatos opcionales de la imagen
