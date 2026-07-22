@@ -77,29 +77,6 @@
 
         <v-divider class="my-4" />
 
-        <!-- Modo demo (bypass persistente para desarrollo) -->
-        <v-btn
-          variant="tonal"
-          color="cyan-lighten-3"
-          block
-          class="text-none mb-3"
-          @click="enterAsDemo"
-        >
-          <v-icon start size="18">mdi-test-tube</v-icon>
-          Ingresar en Modo Demo (Bypass)
-        </v-btn>
-
-        <v-alert
-          variant="outlined"
-          density="compact"
-          color="amber-darken-2"
-          class="mt-2"
-          border="start"
-          icon="mdi-information-outline"
-        >
-          Entorno local de desarrollo. Los servicios reales se activaran en la Fase 2.
-        </v-alert>
-
         <!-- Footer badges -->
         <div class="text-center mt-6">
           <div class="d-flex justify-center ga-4 text-grey-lighten-2">
@@ -146,13 +123,6 @@ const keycloakLoading = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
 
-// Modo demo: activa el estado demo persistente y navega al dashboard
-// Ningun guard ni interceptor puede revertir este estado (isDemoMode=true)
-function enterAsDemo() {
-  authService.enableDemoMode()
-  router.push('/home')
-}
-
 // Keycloak login con timeout de seguridad
 // keycloak.login() redirige el navegador. Si el servidor esta caido o
 // no inicializado, la redireccion nunca ocurre. El timeout detecta eso.
@@ -163,7 +133,7 @@ function handleKeycloakLogin() {
   setTimeout(() => {
     if (keycloakLoading.value) {
       keycloakLoading.value = false
-      errorMessage.value = 'No se pudo conectar con el servidor de autenticacion. Verifique su red o use el Modo Demo.'
+      errorMessage.value = 'No se pudo conectar con el servidor de autenticacion. Verifique su red.'
       showError.value = true
     }
   }, 5000)
