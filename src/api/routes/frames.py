@@ -93,8 +93,8 @@ async def search_frames(
             frames.append(FrameSearchResult(
                 frame_id=row["frame_id"],
                 model_id=row["model_id"],
-                latitude=float(row["latitude"]),
-                longitude=float(row["longitude"]),
+                latitude=float(row["latitude"]) if row["latitude"] is not None else None,
+                longitude=float(row["longitude"]) if row["longitude"] is not None else None,
                 image_url=row["image_url"],
                 detections_count=row["detections_count"],
                 metadata={

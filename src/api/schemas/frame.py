@@ -17,8 +17,8 @@ class DetectionInfo(BaseModel):
 class FrameSearchResult(BaseModel):
     frame_id: str
     model_id: str
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     image_url: str
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadatos originales completos")
     detections_count: int
