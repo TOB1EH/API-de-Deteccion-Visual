@@ -196,7 +196,7 @@ const modelsLoaded = ref(false)
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
-  return new Date(dateStr + 'Z').toLocaleString('es-AR', {
+  return new Date(dateStr).toLocaleString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
