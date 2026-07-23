@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS frames (
     -- Referencias a modelo YOLO usado
     model_id VARCHAR(255) NOT NULL,
     
-    -- Geolocalización obligatoria (S2 requiere lat/lon)
-    latitude FLOAT8 NOT NULL,
-    longitude FLOAT8 NOT NULL,
+    -- Geolocalización (opcional para subidas desde frontend)
+    latitude FLOAT8,
+    longitude FLOAT8,
     
     -- URL pública para acceder a imagen en SeaweedFS (generada por S2)
     image_url TEXT NOT NULL,
@@ -227,4 +227,8 @@ END $$;
 -- ✓ Índices: optimizados para queries S2, S3, S4, S5
 -- ✓ Índice IVFFLAT: búsqueda facial aproximada (S5.3)
 -- ✓ Constraints: validación de datos (confidence 0-1, bbox válido, etc.)
+
+-- Migración: lat/lon ahora son opcionales (subidas desde frontend sin geolocalización)
+ALTER TABLE frames ALTER COLUMN latitude DROP NOT NULL;
+ALTER TABLE frames ALTER COLUMN longitude DROP NOT NULL;
 -- ============================================================================

@@ -255,8 +255,6 @@ const form = reactive({
 const canSubmit = computed(() =>
   imageFile.value &&
   form.model_id &&
-  form.latitude !== '' &&
-  form.longitude !== '' &&
   !loading.value
 )
 
@@ -322,8 +320,8 @@ async function submitDetection() {
     const res = await postDetection({
       image_base64,
       model_id: form.model_id,
-      latitude: parseFloat(form.latitude),
-      longitude: parseFloat(form.longitude),
+      latitude: form.latitude ? parseFloat(form.latitude) : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null,
       confidence: form.confidence,
       metadata: form.camera_id ? { camera_id: form.camera_id } : {}
     })

@@ -38,8 +38,8 @@ class DatabaseService:
             logger.error("Error al conectar a la base de datos: %s", e)
             raise
 
-    def save_frame(self, frame_id: str, model_id: str, latitude: float,
-                   longitude: float, image_url: str, detections_count: int,
+    def save_frame(self, frame_id: str, model_id: str, latitude: Optional[float] = None,
+                   longitude: Optional[float] = None, image_url: str = "", detections_count: int = 0,
                    camera_id: Optional[str] = None, source: Optional[str] = None) -> bool:
         """
         Guarda un frame en la tabla frames de la base de datos

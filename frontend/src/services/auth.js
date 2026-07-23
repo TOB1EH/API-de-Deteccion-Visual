@@ -82,14 +82,17 @@ const keycloak = new Keycloak(keycloakConfig)
 function extractUserFromToken(token) {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]))
+    const roles = payload.realm_access?.roles || []
+    console.log('[Auth Debug] extractUserFromToken roles:', roles, 'username:', payload.preferred_username)
     return {
       username: payload.preferred_username || payload.sub,
       email: payload.email || null,
       firstName: payload.given_name || payload.preferred_username,
       lastName: payload.family_name || '',
-      roles: payload.realm_access?.roles || []
+      roles: roles,
     }
   } catch {
+    console.warn('[Auth Debug] extractUserFromToken: error decodificando token')
     return { username: 'unknown', roles: [] }
   }
 }
@@ -140,6 +143,8 @@ export const authService = {
          ? {}
          : {
              onLoad: 'check-sso',
+             checkLoginIframe: false,
+             silentCheckSsoFallback: true,
              silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
            }
        const authenticated = await keycloak.init(initOptions)
@@ -150,6 +155,19 @@ export const authService = {
         authState.authenticated = true
         authState.loading = false
         console.log('[Keycloak] user from token:', authState.user)
+        console.log('[Auth Debug] Keycloak hasOperator:', authState.user.roles.includes('operator'))
+        console.log('[Auth Debug] Keycloak hasAnyRole admin/operator:', authState.user.roles.includes('admin') || authState.user.roles.includes('operator'))
+        if (!authState.user.roles.includes('operator')) {
+          console.warn('[Auth Debug] ATENCION: Token Keycloak NO tiene rol operator!')
+          try {
+            const full = JSON.parse(atob(keycloak.token.split('.')[1]))
+            console.log('[Auth Debug] Token completo realm_access:', JSON.stringify(full.realm_access))
+          } catch(e) {}
+        }
+        if (localStorage.getItem('facial_token')) {
+          console.log('[Auth Debug] Limpiando facial_token obsoleto')
+          localStorage.removeItem('facial_token')
+        }
         createPersonIfMissing(keycloak.token, authState.user)
         return
       }
@@ -158,16 +176,28 @@ export const authService = {
     }
     const storedToken = localStorage.getItem('facial_token')
     if (storedToken) {
+      console.log('[Auth Debug] Usando facial_token de localStorage')
       try {
         const payload = JSON.parse(atob(storedToken.split('.')[1]))
         if (payload.exp * 1000 > Date.now()) {
+          const expiresIn = payload.exp * 1000 - Date.now()
+          if (expiresIn < 5 * 60 * 1000 && expiresIn > 0) {
+            console.log('[Auth Debug] facial_token por expirar, redirigiendo a login facial para refrescar')
+            localStorage.removeItem('facial_token')
+            authState.authenticated = false
+            authState.loading = false
+            window.location.href = '/login-facial'
+            return
+          }
           authState.token = storedToken
           authState.user = extractUserFromToken(storedToken)
           authState.authenticated = true
           authState.loading = false
-          console.log('[Auth] Sesion iniciada con token facial')
+          console.log('[Auth Debug] facial_token roles:', authState.user.roles)
+          console.log('[Auth Debug] facial_token hasOperator:', authState.user.roles.includes('operator'))
           return
         }
+        console.log('[Auth Debug] facial_token expirado, eliminando')
         localStorage.removeItem('facial_token')
       } catch {
         localStorage.removeItem('facial_token')

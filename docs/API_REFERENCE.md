@@ -1,47 +1,193 @@
-# Referencia de Endpoints API
+# Referencia de la API REST
 
-Todas las rutas usan el prefijo `/api` (proxeado por Nginx).
+**Base URL:** `https://bfts2026.mooo.com/api`
+
+Todas las rutas usan el prefijo `/api` (proxeado por Nginx). La documentacion interactiva (Swagger UI) esta disponible en `/api/docs`.
+
+---
+
+## Autenticacion
+
+El sistema soporta dos metodos de autenticacion:
+
+### Keycloak OAuth2 (JWT RS256)
+
+- Obtener token via Keycloak password grant o redireccion OAuth2
+- Enviar en cada request: `Authorization: Bearer <token>`
+- Roles: `admin`, `operator`, `viewer`
+
+### Token Facial (JWT HS256)
+
+- Generado por `POST /api/auth/login/facial` tras reconocimiento biometrico
+- Mismo formato de autorizacion: `Authorization: Bearer <token>`
+- Incorpora los roles del usuario desde Keycloak si tiene `keycloak_user_id` vinculado
+
+### Permisos por endpoint
+
+| Endpoint | Admin | Operator | Viewer |
+|---|---|---|---|
+| GET /models | SI | SI | SI |
+| POST /detections | SI | SI | NO |
+| GET /frames/* | SI | SI | SI |
+| GET /frames/search | SI | SI | SI |
+| GET /persons | SI | SI | SI |
+| POST /persons | SI | NO | NO |
+| PUT /persons/{id} | SI | NO | NO |
+| DELETE /persons/{id} | SI | NO | NO |
+| POST /persons/{id}/embeddings | SI | SI | NO |
+| POST /face-recognition | SI | SI | NO |
+| POST /auth/register | NO* | NO* | NO* |
+| POST /auth/login/facial | NO* | NO* | NO* |
+
+(* Los endpoints de auth no requieren token — son publicos)
+
+---
 
 ## Health Check
 
 ```
-GET /api/health
+GET /health
 ```
 
 ```bash
-curl http://localhost/api/health
+curl https://bfts2026.mooo.com/api/health
 ```
 
 Respuesta: `"API Detection Service OK"`
 
-## S1 - Listar Modelos
+---
+
+## Autenticacion Facial
+
+### Registro Facial
+
+Registra un nuevo usuario con reconocimiento facial. Crea la persona en BD y el usuario en Keycloak.
 
 ```
-GET /api/models
+POST /auth/register
 ```
 
 ```bash
-curl http://localhost/api/models
+curl -X POST https://bfts2026.mooo.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Juan",
+    "apellido": "Perez",
+    "email": "juan@example.com",
+    "password": "MiPassword123!"
+  }'
 ```
 
 ```json
-["yolo11n.pt", "yolo11s.pt"]
+{
+  "person_id": "uuid",
+  "nombre": "Juan",
+  "apellido": "Perez",
+  "email": "juan@example.com",
+  "message": "Registro exitoso. Enviando fotos faciales al inference-server local.",
+  "access_token": "jwt-token-facial",
+  "token_type": "bearer"
+}
 ```
 
-## S2 - Ejecutar Deteccion
+**Nota:** Despues del registro, las fotos faciales deben enviarse al **inference-server local** (puerto 8001) via `/face/embed`. El inference-server las reenvia a `POST /api/persons/{person_id}/embeddings`.
+
+### Login Facial
+
+Inicia sesion mediante reconocimiento facial. Requiere que el inference-server local haya identificado a la persona y devuelto su `person_id`.
 
 ```
-POST /api/detections
+POST /auth/login/facial
 ```
-
-**Parametros:**
-- `image` (file, required): imagen JPEG/PNG
-- `lat` (form, required): latitud
-- `lon` (form, required): longitud
-- `modelId` (form, optional): nombre del modelo (default: `yolo11n.pt`)
 
 ```bash
-curl -X POST http://localhost/api/detections \
+curl -X POST https://bfts2026.mooo.com/api/auth/login/facial \
+  -H "Content-Type: application/json" \
+  -d '{"person_id": "uuid-de-la-persona"}'
+```
+
+```json
+{
+  "access_token": "jwt-token-facial",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "scope": "openid profile email",
+  "person_id": "uuid",
+  "nombre": "Juan",
+  "apellido": "Perez"
+}
+```
+
+### Verificacion Facial (2FA)
+
+Verifica un rostro como segundo factor de autenticacion post-login Keycloak.
+
+```
+POST /auth/verify-face
+```
+
+Requiere `Authorization: Bearer <token>`.
+
+```bash
+curl -X POST https://bfts2026.mooo.com/api/auth/verify-face \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"person_id": "uuid"}'
+```
+
+---
+
+## S1 - Modelos
+
+### Listar modelos
+
+```
+GET /models
+```
+
+```bash
+curl -H "Authorization: Bearer <token>" https://bfts2026.mooo.com/api/models
+```
+
+```json
+{
+  "models": [
+    {
+      "name": "yolo11n.pt",
+      "size": 47123456,
+      "type": "YOLO",
+      "path": "/app/models/yolo11n.pt"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Descargar modelo
+
+```
+GET /models/{name}/download
+```
+
+Requiere rol `admin` u `operator`.
+
+---
+
+## S2 - Detecciones
+
+### Ejecutar deteccion
+
+Procesa una imagen con el modelo YOLO especificado.
+
+```
+POST /detections
+```
+
+Requiere rol `admin` u `operator`.
+
+```bash
+curl -X POST https://bfts2026.mooo.com/api/detections \
+  -H "Authorization: Bearer <token>" \
   -F "image=@foto.jpg" \
   -F "lat=-34.6037" \
   -F "lon=-58.3816" \
@@ -50,153 +196,325 @@ curl -X POST http://localhost/api/detections \
 
 ```json
 {
-  "frameId": "uuid-string",
+  "frame_id": "uuid",
   "detections": [
     {
-      "detectionId": "uuid",
-      "class": "person",
+      "detection_id": "uuid",
+      "class_name": "person",
       "confidence": 0.95,
       "bbox": [100, 200, 300, 400]
     }
   ],
-  "imageUrl": "http://..."
+  "image_url": "https://bfts2026.mooo.com/api/frames/uuid"
 }
 ```
 
-## S3 - Obtener Fotograma
+### Obtener deteccion por ID
 
 ```
-GET /api/frames/{frameId}?thumbnail=true
+GET /detections/{detection_id}
 ```
+
+---
+
+## S3 - Fotogramas
+
+### Obtener imagen de fotograma
+
+```
+GET /frames/{frame_id}
+```
+
+Parametros opcionales:
+- `thumbnail=true` — devuelve miniatura (mas rapida)
 
 ```bash
-curl -o fotograma.jpg "http://localhost/api/frames/uuid-del-frame?thumbnail=true"
+curl -H "Authorization: Bearer <token>" \
+  -o fotograma.jpg \
+  "https://bfts2026.mooo.com/api/frames/uuid-del-frame?thumbnail=true"
 ```
 
-- `thumbnail=true` (opcional): devuelve miniatura en lugar de imagen completa
+---
 
-## S4 - Buscar Fotogramas
+## S4 - Busqueda
+
+### Buscar fotogramas
 
 ```
-GET /api/frames/search?clases=&lat=&lon=&limit=50
+GET /frames/search
 ```
+
+Parametros:
+- `clases` (opcional): filtro por clases detectadas (ej: `person,car`)
+- `lat`, `lon` (opcional): filtro por ubicacion
+- `radius_km` (opcional, default: 10): radio de busqueda en km
+- `person_id` (opcional): filtrar por persona reconocida
+- `limit` (opcional, default: 50): maximo de resultados
+- `offset` (opcional): paginacion
 
 ```bash
-curl "http://localhost/api/frames/search?clases=person,car&lat=-34.6&lon=-58.38"
+curl -H "Authorization: Bearer <token>" \
+  "https://bfts2026.mooo.com/api/frames/search?clases=person,car&lat=-34.6&lon=-58.38&limit=20"
 ```
 
 ```json
 {
-  "results": [
+  "frames": [
     {
-      "frameId": "uuid",
-      "timestamp": "2026-07-03T20:00:00Z",
+      "frame_id": "uuid",
+      "created_at": "2026-07-03T20:00:00",
       "lat": -34.6037,
       "lon": -58.3816,
-      "detections": ["person", "car"]
+      "detections_count": 3,
+      "detections": [
+        {"class_name": "person", "confidence": 0.95}
+      ],
+      "image_url": "https://bfts2026.mooo.com/api/frames/uuid"
     }
   ],
   "total": 1
 }
 ```
 
-## S5.1 - Crear Persona
+---
+
+## S5 - Personas
+
+### Listar personas
 
 ```
-POST /api/persons
+GET /persons
 ```
 
 ```bash
-curl -X POST http://localhost/api/persons \
+curl -H "Authorization: Bearer <token>" \
+  https://bfts2026.mooo.com/api/persons
+```
+
+```json
+{
+  "persons": [
+    {
+      "person_id": "uuid",
+      "name": "Juan Perez",
+      "email": "juan@example.com",
+      "created_at": "2026-07-03T20:00:00",
+      "keycloak_user_id": "uuid-kc",
+      "embedding_count": 3,
+      "keycloak_roles": ["viewer", "operator"]
+    }
+  ],
+  "total": 1
+}
+```
+
+### Obtener mi persona
+
+```
+GET /persons/me
+```
+
+Devuelve la persona asociada al token del usuario autenticado.
+
+### Obtener persona por ID
+
+```
+GET /persons/{person_id}
+```
+
+### Crear persona
+
+```
+POST /persons
+```
+
+Requiere rol `admin`. Crea persona en BD y usuario en Keycloak. Envia email con credenciales.
+
+```bash
+curl -X POST https://bfts2026.mooo.com/api/persons \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Juan Perez", "metadata": {"notas": "estudiante"}}'
+  -d '{
+    "nombre": "Juan",
+    "apellido": "Perez",
+    "email": "juan@example.com"
+  }'
 ```
 
 ```json
 {
-  "personId": "uuid",
+  "person_id": "uuid",
   "name": "Juan Perez",
-  "createdAt": "2026-07-03T20:00:00Z"
+  "email": "juan@example.com",
+  "created_at": "2026-07-03T20:00:00",
+  "keycloak_user_id": "uuid-kc",
+  "keycloak_roles": ["viewer"]
 }
 ```
 
-## S5.1 - Obtener Persona
+**Nota:** El usuario recibe un email con su contrasena temporal generada aleatoriamente.
+
+### Crear/actualizar mi persona
 
 ```
-GET /api/persons/{personId}
+POST /persons/me
 ```
 
-```bash
-curl http://localhost/api/persons/uuid-de-persona
-```
-
-```json
-{
-  "personId": "uuid",
-  "name": "Juan Perez",
-  "metadata": {},
-  "createdAt": "2026-07-03T20:00:00Z"
-}
-```
-
-## S5.2 - Generar Embeddings Faciales
-
-```
-POST /api/persons/{personId}/embeddings
-```
+Crea o actualiza la persona asociada al token actual. No requiere roles especiales.
 
 ```bash
-curl -X POST http://localhost/api/persons/uuid/embeddings \
+curl -X POST https://bfts2026.mooo.com/api/persons/me \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Juan",
+    "apellido": "Perez",
+    "email": "juan@example.com"
+  }'
+```
+
+### Actualizar persona
+
+```
+PUT /persons/{person_id}
+```
+
+Requiere rol `admin`. Sincroniza nombre y email con Keycloak.
+
+### Eliminar persona
+
+```
+DELETE /persons/{person_id}
+```
+
+Requiere rol `admin`. Tambien elimina el usuario de Keycloak.
+
+### Sincronizar Keycloak
+
+```
+POST /persons/sync-keycloak
+```
+
+Crea registros de persona para usuarios de Keycloak que no tengan persona asociada.
+
+### Generar embedding facial
+
+```
+POST /persons/{person_id}/embeddings
+```
+
+Requiere rol `admin` u `operator`. Envia automaticamente email de notificacion al usuario.
+
+```bash
+curl -X POST https://bfts2026.mooo.com/api/persons/uuid/embeddings \
+  -H "Authorization: Bearer <token>" \
   -F "image=@rostro.jpg"
 ```
 
 ```json
 {
-  "personId": "uuid",
-  "embedding_dim": 128,
-  "processed": true
+  "person_id": "uuid",
+  "embedding_id": "uuid",
+  "dim": 128,
+  "processed": true,
+  "message": "Embedding generado exitosamente"
 }
 ```
 
-## S5.3 - Reconocimiento Facial
+### Generar embedding desde rostro (face-proxy)
 
 ```
-POST /api/face-recognition
+POST /persons/{person_id}/face-embed
 ```
 
-**Parametros:**
-- `image` (file): imagen con rostro
-- `threshold` (opcional, default: 0.8)
+Requiere rol `admin`. Para uso interno del inference-server.
+
+### Listar embeddings de una persona
+
+```
+GET /persons/{person_id}/embeddings
+```
+
+### Reconocimiento facial
+
+```
+POST /face-recognition
+```
+
+Requiere rol `admin` u `operator`. Compara un rostro contra todos los embeddings almacenados.
 
 ```bash
-curl -X POST http://localhost/api/face-recognition \
+curl -X POST https://bfts2026.mooo.com/api/face-recognition \
+  -H "Authorization: Bearer <token>" \
   -F "image=@rostro.jpg" \
-  -F "threshold=0.85"
+  -F "threshold=0.8"
 ```
 
 ```json
 {
-  "personId": "uuid",
+  "person_id": "uuid",
   "name": "Juan Perez",
   "confidence": 0.92,
   "match": true
 }
 ```
 
-Si `confidence <= threshold`, retorna `"match": false` y `"personId": null`.
+Si `confidence <= threshold`, retorna `"match": false` y `"person_id": null`.
 
-## Metricas Prometheus
+---
+
+## Script de Cliente Local
+
+El script `setup_cliente.py` configura el inference-server local necesario para reconocimiento facial.
+
+```
+GET /setup_cliente.py
+```
+
+```bash
+curl -O https://bfts2026.mooo.com/setup_cliente.py
+python3 setup_cliente.py install
+```
+
+Esto inicia un servidor en `http://localhost:8001` con:
+- **Health:** `GET /health`
+- **Reconocimiento:** `POST /face/recognize`
+- **Embedding:** `POST /face/embed`
+
+---
+
+## Metricas
 
 ```
 GET /metrics
 ```
 
+Expone metricas en formato Prometheus.
+
 ```bash
-curl http://localhost:8000/metrics
+curl https://bfts2026.mooo.com/api/metrics
 ```
 
-```
-# HELP api_requests_total Total de requests HTTP
-# TYPE api_requests_total counter
-api_requests_total{endpoint="/api/health",method="GET",http_status="200"} 42
+---
+
+## Codigos de Error
+
+| Codigo | Significado |
+|---|---|
+| 200 | OK |
+| 201 | Creado exitosamente |
+| 400 | Bad Request — parametros invalidos |
+| 401 | No autenticado — token faltante o invalido |
+| 403 | Prohibido — rol insuficiente |
+| 404 | Recurso no encontrado |
+| 409 | Conflicto — recurso duplicado (ej: email existente) |
+| 422 | Unprocessable Entity — validacion de datos fallo |
+| 500 | Error interno del servidor |
+
+### Formato de error
+
+```json
+{
+  "detail": "Descripcion del error"
+}
 ```

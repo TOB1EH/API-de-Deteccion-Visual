@@ -11,7 +11,8 @@ import { authState, hasAnyRole, isAdmin } from '../services/auth'
 const routes = [
   {
     path: '/',
-    redirect: '/home'
+    name: 'Landing',
+    component: () => import('../views/LandingView.vue')
   },
   {
     path: '/home',
@@ -22,7 +23,7 @@ const routes = [
     path: '/monitoreo',
     name: 'Monitoreo',
     component: () => import('../views/MonitoreoView.vue'),
-    meta: { roles: ['admin', 'operator'] }
+    meta: { roles: ['admin'] }
   },
   {
     path: '/login',
@@ -35,11 +36,10 @@ const routes = [
     component: () => import('../views/FaceLoginView.vue')
   },
   {
-    // Cargar imagen: solo admin y operator pueden procesar imagenes
+    // Cargar imagen: cualquier usuario autenticado puede procesar imagenes
     path: '/cargar',
     name: 'Cargar',
-    component: () => import('../views/DashboardView.vue'),
-    meta: { roles: ['admin', 'operator'] }
+    component: () => import('../views/DashboardView.vue')
   },
   {
     path: '/buscar',
@@ -111,8 +111,8 @@ router.beforeEach((to, from, next) => {
     next()
     return
   }
-  // Las paginas de login y registro facial siempre son accesibles
-  if (to.path === '/login' || to.path === '/login-facial') {
+  // La landing page, login y registro facial siempre son accesibles
+  if (to.name === 'Landing' || to.path === '/login' || to.path === '/login-facial') {
     next()
     return
   }

@@ -119,7 +119,7 @@ def _run_inference(image_base64: str, model_id: str, confidence: float) -> list:
 
 
 @router.post("", response_model=DetectionResponse,
-             dependencies=[Depends(require_role(["admin", "operator"]))])
+             dependencies=[Depends(require_role(["admin", "operator", "viewer"]))])
 async def process_detections(request: DetectionRequest):
     """
     Procesa detecciones recibidas desde el cliente.
