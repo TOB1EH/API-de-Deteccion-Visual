@@ -47,6 +47,51 @@
           <v-img v-if="previewUrl" :src="previewUrl" max-height="300" contain class="rounded-lg" />
         </div>
 
+        <v-row v-if="!webcamActive && !previewUrl" class="mt-3">
+          <v-col cols="12" class="text-center">
+            <v-btn
+              variant="tonal"
+              color="cyan-accent-3"
+              class="text-none"
+              @click="startWebcam"
+              :disabled="loading"
+            >
+              <v-icon start>mdi-webcam</v-icon>
+              Usar webcam
+            </v-btn>
+          </v-col>
+        </v-row>
+
+        <div v-if="webcamActive" class="text-center mt-3">
+          <video
+            ref="videoRef"
+            autoplay
+            playsinline
+            class="webcam-video rounded-lg"
+            style="max-width: 100%; max-height: 300px; transform: scaleX(-1);"
+          />
+          <div class="mt-3">
+            <v-btn
+              color="cyan-accent-3"
+              class="text-none mr-2"
+              @click="captureWebcam"
+              :disabled="loading"
+            >
+              <v-icon start>mdi-camera</v-icon>
+              Capturar
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              color="grey"
+              class="text-none"
+              @click="stopWebcam"
+              :disabled="loading"
+            >
+              Cancelar
+            </v-btn>
+          </div>
+        </div>
+
         <v-divider class="my-5" />
 
         <v-row>
@@ -232,13 +277,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { getModels, postDetection, fileToBase64 } from '../services/api'
 
 const fileInput = ref(null)
+const videoRef = ref(null)
 const imageFile = ref(null)
 const previewUrl = ref(null)
 const isDragging = ref(false)
+const webcamActive = ref(false)
+let mediaStream = null
 const models = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -296,9 +344,45 @@ function handleFile(file) {
 function clearFile() {
   imageFile.value = null
   previewUrl.value = null
+  if (webcamActive.value) stopWebcam()
   if (fileInput.value) {
     fileInput.value.value = ''
   }
+}
+
+async function startWebcam() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    webcamActive.value = true
+    await nextTick()
+    if (videoRef.value) {
+      videoRef.value.srcObject = mediaStream
+    }
+  } catch {
+    error.value = 'No se pudo acceder a la webcam. Verifica los permisos.'
+  }
+}
+
+function stopWebcam() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop())
+    mediaStream = null
+  }
+  webcamActive.value = false
+}
+
+function captureWebcam() {
+  const video = videoRef.value
+  if (!video) return
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext('2d').drawImage(video, 0, 0)
+  canvas.toBlob((blob) => {
+    imageFile.value = blob
+    previewUrl.value = URL.createObjectURL(blob)
+  }, 'image/jpeg')
+  stopWebcam()
 }
 
 async function copyFrameId() {

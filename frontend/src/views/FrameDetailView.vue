@@ -114,7 +114,7 @@
           <v-divider class="my-2 border-opacity-25" />
           <div class="d-flex justify-space-between py-1">
             <span class="text-cyan-lighten-4 font-weight-medium">Fecha:</span>
-            <span class="text-green-accent-3 font-weight-bold text-caption">{{ new Date(frame.created_at + 'Z').toLocaleString() }}</span>
+            <span class="text-green-accent-3 font-weight-bold text-caption">{{ new Date(frame.created_at).toLocaleString() }}</span>
           </div>
         </v-sheet>
         <div class="pa-4 pt-0">
